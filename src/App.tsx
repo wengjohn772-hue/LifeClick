@@ -8,7 +8,8 @@ import { ClickerScreen } from './pages/ClickerScreen';
 import { FafScreen } from './pages/FafScreen';
 import { FeedsScreen } from './pages/FeedsScreen';
 import { SettingsScreen } from './pages/SettingsScreen';
-import { TabId, Profile } from './types/app';
+import { RiskDashboard } from './pages/RiskDashboard';
+import { CheckInRecord, TabId, Profile } from './types/app';
 import { login } from './lib/api';
 
 interface AppProps {
@@ -33,17 +34,44 @@ const defaultProfile: Profile = {
 
 function LogoPulse() {
   return (
-    <div className="relative flex items-center justify-center">
-      <div className="absolute h-40 w-40 rounded-full bg-violet-200/40 blur-2xl" />
-      <div className="relative flex items-center gap-3 rounded-full border border-violet-300/60 bg-white/70 px-5 py-3 shadow-lg shadow-violet-500/10 backdrop-blur-md">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-600 text-lg font-bold text-white shadow-md shadow-violet-500/30">
-          <span>❤</span>
-        </div>
-        <div className="text-4xl font-black tracking-tight text-violet-900">
-          <span className="inline-block">Life</span>
-          <span className="ml-1 inline-block text-violet-700">Click</span>
-        </div>
-      </div>
+    <div className="relative flex w-full max-w-[430px] items-center justify-center">
+      <div className="absolute h-40 w-72 rounded-full bg-violet-200/35 blur-3xl" />
+      <svg
+        viewBox="0 70 455 100"
+        role="img"
+        aria-label="LifeClick"
+        className="relative h-auto w-full drop-shadow-[0_10px_18px_rgba(76,29,149,0.18)]"
+      >
+        <text
+          x="58"
+          y="132"
+          fill="#43205f"
+          fontFamily="Trebuchet MS, Century Gothic, sans-serif"
+          fontSize="70"
+          fontWeight="700"
+          letterSpacing="-3"
+        >
+          LifeClick
+        </text>
+        <path
+          d="M17 151H164l12-1 9-17 10 48 12-76 13 45h166l10-16 8 20 10-12 9 10h17"
+          fill="none"
+          stroke="#43205f"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="30" cy="151" r="14" fill="white" stroke="#43205f" strokeWidth="4" />
+        <circle cx="30" cy="151" r="5" fill="#43205f" />
+        <path
+          d="M431 110c-9 0-16 7-16 16 0 13 16 31 16 31s16-18 16-31c0-9-7-16-16-16Z"
+          fill="white"
+          stroke="#43205f"
+          strokeWidth="4"
+          strokeLinejoin="round"
+        />
+        <circle cx="431" cy="126" r="5" fill="#43205f" />
+      </svg>
     </div>
   );
 }
@@ -60,6 +88,36 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
   const [userId, setUserId] = useState<string | number>('demo-user');
   const [clickMinutes, setClickMinutes] = useState(30);
   const [remind, setRemind] = useState(true);
+  const [checkIns, setCheckIns] = useState<CheckInRecord[]>([]);
+  const [missedClicks, setMissedClicks] = useState(0);
+  const [fakeAlerts, setFakeAlerts] = useState(0);
+  const [behaviorScore, setBehaviorScore] = useState(100);
+  const [nextCheckInAt, setNextCheckInAt] = useState(() => Date.now() + 30 * 60 * 1000);
+
+  const handleCheckIn = (record: CheckInRecord) => {
+    setCheckIns((previous) => [record, ...previous].slice(0, 5));
+    setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
+  };
+
+  const handleFalseAlert = () => {
+    setFakeAlerts((previous) => previous + 1);
+    setBehaviorScore((previous) => Math.max(0, previous - 10));
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (Date.now() < nextCheckInAt) return;
+      setBehaviorScore((previous) => Math.max(0, previous - 10));
+      setMissedClicks((previous) => {
+        if (previous === 0 && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('LifeClick check-in missed', { body: 'Please confirm you are safe.' });
+        }
+        return previous + 1;
+      });
+      setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [clickMinutes, nextCheckInAt]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setScreen('auth'), 1800);
@@ -133,15 +191,15 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
   if (screen === 'auth') {
     return (
       <ThemeProvider initialTheme={initialTheme}>
-        <div className="flex h-full w-full items-center justify-center bg-[#f6f3fa] px-5 py-6">
-          <div className="w-full max-w-md rounded-[28px] border border-violet-200 bg-white p-6 shadow-[0_24px_60px_rgba(91,33,182,0.12)]">
+        <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_0%,_rgba(124,58,237,0.55),_transparent_42%),linear-gradient(145deg,_#050507_0%,_#160b26_52%,_#3b0764_100%)] px-5 py-6">
+          <div className="w-full max-w-md rounded-[28px] border border-white/15 bg-black/35 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
             <div className="mb-6 flex justify-center">
               <LogoPulse />
             </div>
 
             <div className="mb-5 text-center">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-500">Welcome back</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-violet-900">LifeClick</h2>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-300">Welcome back</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">LifeClick</h2>
             </div>
 
             <div className="mb-4 grid grid-cols-2 gap-3">
@@ -151,7 +209,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                   authMethod === 'google'
                     ? 'border-violet-600 bg-violet-600 text-white'
-                    : 'border-violet-200 bg-violet-50 text-violet-700'
+                    : 'border-white/15 bg-white/10 text-violet-100 hover:bg-white/15'
                 }`}
               >
                 <Globe className="h-4 w-4" />
@@ -163,7 +221,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                   authMethod === 'email'
                     ? 'border-violet-600 bg-violet-600 text-white'
-                    : 'border-violet-200 bg-violet-50 text-violet-700'
+                    : 'border-white/15 bg-white/10 text-violet-100 hover:bg-white/15'
                 }`}
               >
                 <Mail className="h-4 w-4" />
@@ -179,25 +237,25 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                   void handleContinue();
                 }}
               >
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-violet-100">
                   Email
                   <input
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="you@example.com"
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-800 outline-none ring-0 transition focus:border-violet-500"
+                    className="mt-1 w-full rounded-2xl border border-white/15 bg-white/10 px-3 py-3 text-white outline-none ring-0 transition placeholder:text-white/40 focus:border-violet-400 focus:bg-white/15"
                   />
                 </label>
 
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-violet-100">
                   Password
                   <input
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="••••••••"
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-800 outline-none ring-0 transition focus:border-violet-500"
+                    className="mt-1 w-full rounded-2xl border border-white/15 bg-white/10 px-3 py-3 text-white outline-none ring-0 transition placeholder:text-white/40 focus:border-violet-400 focus:bg-white/15"
                   />
                 </label>
 
@@ -225,7 +283,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 <button
                   type="button"
                   onClick={() => setAuthMethod('email')}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-violet-100 transition hover:bg-white/15"
                 >
                   <Mail className="h-4 w-4" />
                   Use email instead
@@ -233,7 +291,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
               </div>
             )}
 
-            <div className="mt-5 space-y-2 rounded-2xl border border-violet-100 bg-violet-50 p-3 text-xs text-violet-800">
+            <div className="mt-5 space-y-2 rounded-2xl border border-violet-300/20 bg-violet-400/10 p-3 text-xs text-violet-100">
               <div className="flex items-center gap-2">
                 <BellRing className="h-3.5 w-3.5" />
                 Notification permission is requested when you begin.
@@ -248,7 +306,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
               </div>
             </div>
 
-            {status && <p className="mt-4 text-center text-xs text-slate-500">{status}</p>}
+            {status && <p className="mt-4 text-center text-xs text-violet-200/75">{status}</p>}
           </div>
         </div>
       </ThemeProvider>
@@ -275,9 +333,10 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 className="flex flex-1 flex-col overflow-hidden"
               >
                 {active === 'map' && <MapScreen userId={userId} />}
-                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} />}
+                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} onCheckIn={handleCheckIn} />}
                 {active === 'faf' && <FafScreen />}
                 {active === 'feeds' && <FeedsScreen />}
+                {active === 'risk' && <RiskDashboard checkIns={checkIns} missedClicks={missedClicks} fakeAlerts={fakeAlerts} behaviorScore={behaviorScore} nextCheckInAt={nextCheckInAt} onFalseAlert={handleFalseAlert} />}
                 {active === 'settings' && (
                   <SettingsScreen
                     profile={profile}

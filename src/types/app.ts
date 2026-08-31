@@ -1,4 +1,9 @@
-export type TabId = 'map' | 'clicker' | 'faf' | 'feeds' | 'settings';
+export type TabId = 'map' | 'clicker' | 'faf' | 'feeds' | 'risk' | 'settings';
+
+export interface CheckInRecord {
+  id: number;
+  at: Date;
+}
 
 export interface Post {
   id: string;

@@ -4,6 +4,7 @@ import {
   ShieldCheckIcon,
   PersonStandingIcon,
   NewspaperIcon,
+  BrainCircuit,
   SettingsIcon,
 } from 'lucide-react';
 import { TabId } from '../types/app';
@@ -18,6 +19,7 @@ const tabs: { id: TabId; label: string; icon: typeof MapIcon }[] = [
   { id: 'clicker', label: 'Clicker', icon: ShieldCheckIcon },
   { id: 'faf', label: 'FaF', icon: PersonStandingIcon },
   { id: 'feeds', label: 'Feeds', icon: NewspaperIcon },
+  { id: 'risk', label: 'Safety', icon: BrainCircuit },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
