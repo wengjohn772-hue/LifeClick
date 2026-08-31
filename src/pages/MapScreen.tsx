@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LocateFixedIcon, LoaderCircleIcon, TriangleAlertIcon } from 'lucide-react';
 import { saveLocation } from '../lib/api';
 

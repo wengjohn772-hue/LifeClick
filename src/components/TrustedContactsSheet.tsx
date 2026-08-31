@@ -1,4 +1,3 @@
-import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { XIcon, PhoneIcon, StarIcon, PlusIcon } from 'lucide-react';
 import { trustedContacts } from '../data/contacts';
