@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
+import { readFileSync } from 'node:fs';
 import 'dotenv/config';
 
 const { Pool } = pg;
@@ -12,6 +13,24 @@ app.use(cors());
 app.use(express.json());
 
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
+const schemaSql = readFileSync(new URL('./db/schema.sql', import.meta.url), 'utf8');
+let databaseInitialization;
+
+function initializeDatabase() {
+  if (!pool) return Promise.resolve();
+  if (!databaseInitialization) {
+    databaseInitialization = pool.query(schemaSql).catch((error) => {
+      databaseInitialization = undefined;
+      console.warn('Database schema initialization skipped:', error.message);
+    });
+  }
+  return databaseInitialization;
+}
+
+app.use(async (_req, _res, next) => {
+  await initializeDatabase();
+  next();
+});
 
 app.get('/api/health', async (_req, res) => {
   if (!pool) {
