@@ -152,8 +152,9 @@ app.post('/api/auth/register', async (req, res) => {
     });
   }
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     const result = await client.query(
       `INSERT INTO users (email, name, phone, address, faf_id, password_hash, created_at)
@@ -177,10 +178,19 @@ app.post('/api/auth/register', async (req, res) => {
       trustedContacts: safeContacts,
     });
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK').catch(() => undefined);
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      return res.status(202).json({
+        ok: true,
+        saved: false,
+        user: { id: `user-${Date.now()}`, name: String(name).trim(), email: safeEmail, provider: 'email', phone: String(phone).trim(), address: String(address).trim(), fafId: 'FAF-DEMO' },
+        trustedContacts: safeContacts,
+        message: 'Database unavailable. Account is active for this session only; start PostgreSQL to persist it.',
+      });
+    }
     res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'An account with that email already exists.' : error.message });
   } finally {
-    client.release();
+    client?.release();
   }
 });
 
