@@ -111,6 +111,11 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
     setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
   };
 
+  const handleClickMinutesChange = (nextMinutes: number) => {
+    setClickMinutes(nextMinutes);
+    if (sessionActive) setNextCheckInAt(Date.now() + nextMinutes * 60 * 1000);
+  };
+
   useEffect(() => {
     if (!sessionActive || !('geolocation' in navigator)) return;
     const watchId = navigator.geolocation.watchPosition(
@@ -137,8 +142,14 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
 
   useEffect(() => {
     if (!sessionActive) return undefined;
+    let reminderSentFor: number | null = null;
     const timer = window.setInterval(() => {
-      if (Date.now() < nextCheckInAt) return;
+      const remaining = nextCheckInAt - Date.now();
+      if (remind && remaining > 0 && remaining <= 5 * 60 * 1000 && reminderSentFor !== nextCheckInAt && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('LifeClick reminder', { body: 'Your safety check-in is due in five minutes.' });
+        reminderSentFor = nextCheckInAt;
+      }
+      if (remaining > 0) return;
       setBehaviorScore((previous) => Math.max(0, previous - 10));
       setMissedClicks((previous) => {
         if (previous === 0 && 'Notification' in window && Notification.permission === 'granted') {
@@ -420,7 +431,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 className="flex flex-1 flex-col overflow-hidden"
               >
                 {active === 'map' && <MapScreen location={location} updatedAt={locationUpdatedAt} />}
-                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} nextCheckInAt={nextCheckInAt} onCheckIn={handleCheckIn} />}
+                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} nextCheckInAt={nextCheckInAt} checkIns={checkIns} onCheckIn={handleCheckIn} />}
                 {active === 'faf' && <FafScreen />}
                 {active === 'feeds' && <FeedsScreen />}
                 {active === 'risk' && <RiskDashboard checkIns={checkIns} missedClicks={missedClicks} fakeAlerts={fakeAlerts} behaviorScore={behaviorScore} nextCheckInAt={nextCheckInAt} onFalseAlert={handleFalseAlert} />}
@@ -429,7 +440,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                     profile={profile}
                     onProfileChange={setProfile}
                     clickMinutes={clickMinutes}
-                    onClickMinutesChange={setClickMinutes}
+                    onClickMinutesChange={handleClickMinutesChange}
                     remind={remind}
                     onRemindChange={setRemind}
                   />

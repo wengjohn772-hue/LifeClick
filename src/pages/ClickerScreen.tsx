@@ -3,20 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BellRingIcon, CheckIcon, Clock3Icon } from 'lucide-react';
 import { CheckInRecord } from '../types/app';
 
-interface CheckIn {
-  id: number;
-  at: Date;
-}
-
 interface ClickerScreenProps {
   clickMinutes: number;
   remind: boolean;
   nextCheckInAt: number;
+  checkIns: CheckInRecord[];
   onCheckIn: (record: CheckInRecord) => void;
 }
 
-export function ClickerScreen({ clickMinutes, remind, nextCheckInAt, onCheckIn }: ClickerScreenProps) {
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+export function ClickerScreen({ clickMinutes, remind, nextCheckInAt, checkIns, onCheckIn }: ClickerScreenProps) {
   const [pulseKey, setPulseKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
@@ -41,7 +36,6 @@ export function ClickerScreen({ clickMinutes, remind, nextCheckInAt, onCheckIn }
 
   const handleClick = () => {
     const record = { id: Date.now(), at: new Date() };
-    setCheckIns((prev) => [record, ...prev].slice(0, 5));
     onCheckIn(record);
     setPulseKey((k) => k + 1);
   };
