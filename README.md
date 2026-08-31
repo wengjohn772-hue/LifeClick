@@ -22,6 +22,77 @@ Add the following key to `.env`:
 
 The map uses Google satellite mode and centers automatically when the browser accepts location access.
 
+## Database setup
+
+DBeaver is the database client. You still need a PostgreSQL database, either installed locally or hosted by a provider such as Neon, Supabase, or Railway.
+
+### Option A: Local PostgreSQL
+
+1. Install PostgreSQL for your operating system.
+2. Start the PostgreSQL service.
+3. Create the application database:
+
+   ```sql
+   CREATE DATABASE lifeclick;
+   ```
+
+4. Open DBeaver and create a PostgreSQL connection with:
+   - Host: `localhost`
+   - Port: `5432`
+   - Database: `lifeclick`
+   - Username: your PostgreSQL username
+   - Password: your PostgreSQL password
+5. Open `server/db/schema.sql` in DBeaver.
+6. Select the `lifeclick` connection and execute the complete script.
+7. Refresh the DBeaver database tree and confirm the `users`, `trusted_contacts`, `location_events`, `check_ins`, `alerts`, and `user_settings` tables exist.
+
+### Connect the local project
+
+1. Copy the environment template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update `.env` with your actual PostgreSQL credentials:
+
+   ```env
+   DATABASE_URL=postgresql://USERNAME:PASSWORD@localhost:5432/lifeclick
+   PORT=4000
+   ```
+
+3. Start the API:
+
+   ```bash
+   npm run dev:server
+   ```
+
+4. In another terminal, check the connection:
+
+   ```bash
+   curl http://localhost:4000/api/health
+   ```
+
+   A working database returns:
+
+   ```json
+   {"ok":true,"database":"connected"}
+   ```
+
+5. Start the frontend with `npm run dev`. Account creation and live location records will now use PostgreSQL.
+
+### Connect Vercel
+
+For the deployed app, add these under **Vercel → Project Settings → Environment Variables**:
+
+```env
+DATABASE_URL=your-hosted-postgresql-connection-string
+VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
+VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+```
+
+Use a hosted PostgreSQL connection string for Vercel. Do not use `localhost` in Vercel. Run `server/db/schema.sql` against that hosted database through DBeaver, then redeploy the Vercel project.
+
 ## Backend architecture
 
 The backend is deliberately simple and production-friendly:

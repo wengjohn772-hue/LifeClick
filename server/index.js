@@ -22,7 +22,7 @@ app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, database: 'connected' });
   } catch (error) {
-    res.status(500).json({ ok: false, database: 'disconnected', error: error.message });
+    res.status(500).json({ ok: false, database: 'disconnected', error: error.message || 'Unable to connect to PostgreSQL.' });
   }
 });
 
@@ -194,6 +194,10 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`LifeClick backend running on http://localhost:${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`LifeClick backend running on http://localhost:${PORT}`);
+  });
+}

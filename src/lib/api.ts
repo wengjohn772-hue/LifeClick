@@ -1,4 +1,11 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000')).replace(/\/$/, '');
+
+async function readResponse(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) return response.json();
+  await response.text();
+  throw new Error(response.status === 404 ? 'API route not found. Redeploy the project with the Vercel API function enabled.' : `API request failed (${response.status}).`);
+}
 
 export interface AuthUser {
   id: string | number;
@@ -34,7 +41,7 @@ export async function login(email: string, password: string, method: 'google' | 
     body: JSON.stringify({ email, password, method }),
   });
 
-  const data = await response.json();
+  const data = await readResponse(response);
   if (!response.ok) throw new Error(data?.error || 'Unable to sign in');
   return data as { ok: true; user: AuthUser; trustedContacts?: RegistrationPayload['trustedContacts'] };
 }
@@ -46,7 +53,7 @@ export async function register(payload: RegistrationPayload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data = await readResponse(response);
   if (!response.ok) throw new Error(data?.error || 'Unable to create account');
   return data as { ok: true; user: AuthUser; trustedContacts: RegistrationPayload['trustedContacts'] };
 }
