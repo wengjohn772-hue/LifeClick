@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
+  address TEXT,
+  faf_id VARCHAR(32) UNIQUE,
   password_hash TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -15,6 +17,9 @@ CREATE TABLE IF NOT EXISTS trusted_contacts (
   relationship VARCHAR(100),
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS faf_id VARCHAR(32) UNIQUE;
 
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,

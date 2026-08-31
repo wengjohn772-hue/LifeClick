@@ -113,6 +113,60 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ ok: true, user });
 });
 
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password, phone, address, trustedContacts = [] } = req.body || {};
+
+  if (!name || !email || !password || !phone || !address) {
+    return res.status(400).json({ error: 'Full name, email, password, number, and address are required.' });
+  }
+
+  const safeEmail = String(email).trim().toLowerCase();
+  const safeContacts = Array.isArray(trustedContacts)
+    ? trustedContacts.filter((contact) => contact?.name && contact?.phone).slice(0, 5)
+    : [];
+
+  if (!pool) {
+    return res.status(202).json({
+      ok: true,
+      saved: false,
+      user: { id: `user-${Date.now()}`, name: String(name).trim(), email: safeEmail, provider: 'email', fafId: 'FAF-DEMO' },
+      trustedContacts: safeContacts,
+      message: 'Database not configured. Account accepted in local demo mode.',
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `INSERT INTO users (email, name, phone, address, faf_id, password_hash, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       RETURNING id, email, name, phone, address, faf_id`,
+      [safeEmail, String(name).trim(), String(phone).trim(), String(address).trim(), `FAF-${Math.floor(1000 + Math.random() * 9000)}`, password]
+    );
+    const user = result.rows[0];
+    for (const contact of safeContacts) {
+      await client.query(
+        `INSERT INTO trusted_contacts (user_id, name, phone, relationship, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [user.id, String(contact.name).trim(), String(contact.phone).trim(), String(contact.relation || 'Trusted contact').trim()]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json({
+      ok: true,
+      saved: true,
+      user: { id: user.id, name: user.name, email: user.email, provider: 'email', phone: user.phone, address: user.address, fafId: user.faf_id },
+      trustedContacts: safeContacts,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'An account with that email already exists.' : error.message });
+  } finally {
+    client.release();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`LifeClick backend running on http://localhost:${PORT}`);
 });

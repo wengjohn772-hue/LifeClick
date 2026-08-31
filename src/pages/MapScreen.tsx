@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { LocateFixedIcon, LoaderCircleIcon, TriangleAlertIcon } from 'lucide-react';
-import { saveLocation } from '../lib/api';
 
 type LatLngTuple = [number, number];
 
@@ -13,20 +12,20 @@ declare global {
 const FALLBACK_CENTER: LatLngTuple = [40.7128, -74.006];
 
 interface MapScreenProps {
-  userId: string | number;
+  location: { latitude: number; longitude: number; accuracy: number } | null;
+  updatedAt: Date | null;
 }
 
-export function MapScreen({ userId }: MapScreenProps) {
+export function MapScreen({ location, updatedAt }: MapScreenProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const circleRef = useRef<any>(null);
-  const [position, setPosition] = useState<LatLngTuple | null>(null);
-  const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [locationAccepted, setLocationAccepted] = useState(false);
+  const position: LatLngTuple | null = location ? [location.latitude, location.longitude] : null;
+  const accuracy = location?.accuracy ?? null;
+  const locationAccepted = Boolean(location);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -64,52 +63,9 @@ export function MapScreen({ userId }: MapScreenProps) {
   }, []);
 
   useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      setError('This device does not support geolocation.');
-      return;
-    }
-
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setPosition([lat, lng]);
-        setAccuracy(pos.coords.accuracy);
-        setUpdatedAt(new Date());
-        setLocationAccepted(true);
-        setError(null);
-        void saveLocation({
-          userId,
-          latitude: lat,
-          longitude: lng,
-          accuracy: pos.coords.accuracy,
-          status: 'live',
-        }).catch(() => undefined);
-      },
-      (geoError) => {
-        if (geoError.code === geoError.PERMISSION_DENIED) {
-          setError('Location access was denied. Allow it to show your real-time map pin.');
-        } else {
-          setError('Unable to fetch location right now. Please try again.');
-        }
-        setLocationAccepted(false);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
-
-  useEffect(() => {
     if (!mapRef.current) return;
 
     if (!mapReady || !window.google?.maps) {
-      if (!mapInstance.current) {
-        mapInstance.current = {
-          setCenter: () => undefined,
-          setZoom: () => undefined,
-        };
-      }
       return;
     }
 
@@ -202,11 +158,14 @@ export function MapScreen({ userId }: MapScreenProps) {
         <div id="map" ref={mapRef} className="h-full w-full" />
 
         {!mapReady && (
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(59,130,246,0.18),_rgba(15,23,42,0.9)_60%,_rgba(15,23,42,1)_100%)]">
-            <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3 rounded-full border border-white/20 bg-slate-900/20 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-sm">
-              <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
-              Satellite view loading…
+          <div className="pointer-events-none absolute inset-0 overflow-hidden bg-[#26343a]">
+            <div className="absolute inset-0 opacity-80 [background-image:linear-gradient(32deg,transparent_44%,rgba(238,220,169,0.55)_45%,rgba(238,220,169,0.55)_47%,transparent_48%),linear-gradient(118deg,transparent_46%,rgba(197,205,167,0.42)_47%,rgba(197,205,167,0.42)_52%,transparent_53%),radial-gradient(ellipse_at_25%_30%,#4f684e_0%,#344b41_42%,transparent_43%),radial-gradient(ellipse_at_78%_72%,#586949_0%,#344b41_38%,transparent_39%)]" />
+            <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.24)_1px,transparent_1px)] [background-size:42px_42px]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-950/35" />
+            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 rounded-2xl border border-white/25 bg-slate-950/45 px-4 py-3 text-center text-white shadow-xl backdrop-blur-sm">
+              <span className="h-4 w-4 rounded-full border-4 border-white bg-violet-500 shadow-[0_0_0_8px_rgba(139,92,246,0.25)]" />
+              <span className="text-sm font-semibold">Satellite preview</span>
+              <span className="text-xs text-white/70">Add a Google Maps key for live imagery</span>
             </div>
           </div>
         )}

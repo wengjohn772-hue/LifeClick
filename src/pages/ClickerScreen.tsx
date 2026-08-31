@@ -11,23 +11,19 @@ interface CheckIn {
 interface ClickerScreenProps {
   clickMinutes: number;
   remind: boolean;
+  nextCheckInAt: number;
   onCheckIn: (record: CheckInRecord) => void;
 }
 
-export function ClickerScreen({ clickMinutes, remind, onCheckIn }: ClickerScreenProps) {
+export function ClickerScreen({ clickMinutes, remind, nextCheckInAt, onCheckIn }: ClickerScreenProps) {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [pulseKey, setPulseKey] = useState(0);
-  const [nextCheckInAt, setNextCheckInAt] = useState(() => Date.now() + clickMinutes * 60 * 1000);
   const [now, setNow] = useState(() => Date.now());
 
   const last = checkIns[0];
   const remainingSeconds = Math.max(0, Math.ceil((nextCheckInAt - now) / 1000));
   const totalSeconds = clickMinutes * 60;
   const progress = Math.min(100, Math.max(0, (remainingSeconds / totalSeconds) * 100));
-
-  useEffect(() => {
-    setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
-  }, [clickMinutes]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -48,7 +44,6 @@ export function ClickerScreen({ clickMinutes, remind, onCheckIn }: ClickerScreen
     setCheckIns((prev) => [record, ...prev].slice(0, 5));
     onCheckIn(record);
     setPulseKey((k) => k + 1);
-    setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
   };
 
   return (

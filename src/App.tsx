@@ -10,7 +10,7 @@ import { FeedsScreen } from './pages/FeedsScreen';
 import { SettingsScreen } from './pages/SettingsScreen';
 import { RiskDashboard } from './pages/RiskDashboard';
 import { CheckInRecord, TabId, Profile } from './types/app';
-import { login } from './lib/api';
+import { getGoogleAuthUrl, login, register, saveLocation } from './lib/api';
 
 interface AppProps {
   initialTab?: TabId;
@@ -19,6 +19,7 @@ interface AppProps {
 
 type ScreenState = 'splash' | 'auth' | 'app';
 type AuthMethod = 'google' | 'email';
+type AuthMode = 'login' | 'register';
 
 const defaultProfile: Profile = {
   name: 'Ava Brooks',
@@ -30,6 +31,7 @@ const defaultProfile: Profile = {
   role: 'Safety lead',
   postsEnabled: true,
   feedsEnabled: true,
+  trustedContacts: [],
 };
 
 function LogoPulse() {
@@ -80,8 +82,15 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
   const [active, setActive] = useState<TabId>(initialTab);
   const [screen, setScreen] = useState<ScreenState>('splash');
   const [authMethod, setAuthMethod] = useState<AuthMethod>('email');
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [trustedContactName, setTrustedContactName] = useState('');
+  const [trustedContactPhone, setTrustedContactPhone] = useState('');
+  const [trustedContactRelation, setTrustedContactRelation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState('');
   const [profile, setProfile] = useState<Profile>(defaultProfile);
@@ -93,11 +102,33 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
   const [fakeAlerts, setFakeAlerts] = useState(0);
   const [behaviorScore, setBehaviorScore] = useState(100);
   const [nextCheckInAt, setNextCheckInAt] = useState(() => Date.now() + 30 * 60 * 1000);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [locationUpdatedAt, setLocationUpdatedAt] = useState<Date | null>(null);
 
   const handleCheckIn = (record: CheckInRecord) => {
     setCheckIns((previous) => [record, ...previous].slice(0, 5));
     setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
   };
+
+  useEffect(() => {
+    if (!sessionActive || !('geolocation' in navigator)) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const nextLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        setLocation(nextLocation);
+        setLocationUpdatedAt(new Date());
+        void saveLocation({ userId, ...nextLocation, status: 'live' }).catch(() => undefined);
+      },
+      () => undefined,
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [sessionActive, userId]);
 
   const handleFalseAlert = () => {
     setFakeAlerts((previous) => previous + 1);
@@ -105,6 +136,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
   };
 
   useEffect(() => {
+    if (!sessionActive) return undefined;
     const timer = window.setInterval(() => {
       if (Date.now() < nextCheckInAt) return;
       setBehaviorScore((previous) => Math.max(0, previous - 10));
@@ -117,7 +149,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
       setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [clickMinutes, nextCheckInAt]);
+  }, [clickMinutes, nextCheckInAt, sessionActive]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setScreen('auth'), 1800);
@@ -154,13 +186,27 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
         method: authMethod,
       };
 
-      const authData = await login(loginPayload.email, loginPayload.password, authMethod);
+      const contact = trustedContactName.trim() && trustedContactPhone.trim()
+        ? [{ name: trustedContactName.trim(), phone: trustedContactPhone.trim(), relation: trustedContactRelation.trim() || 'Trusted contact' }]
+        : [];
+      const authData = authMode === 'register'
+        ? await register({ name: fullName.trim(), email: loginPayload.email, password: loginPayload.password, phone: phone.trim(), address: address.trim(), trustedContacts: contact })
+        : await login(loginPayload.email, loginPayload.password, authMethod);
 
       if (authData?.user) {
         setUserId(authData.user.id);
-        setProfile((prev) => ({ ...prev, email: authData.user.email || prev.email, name: authData.user.name || prev.name }));
+        setProfile((prev) => ({
+          ...prev,
+          email: authData.user.email || prev.email,
+          name: authData.user.name || prev.name,
+          phone: authData.user.phone || phone || prev.phone,
+          address: authData.user.address || address || prev.address,
+          fafId: authData.user.fafId || prev.fafId,
+          trustedContacts: authMode === 'register' ? contact : prev.trustedContacts,
+        }));
       }
 
+      setSessionActive(true);
       setScreen('app');
     } catch (error) {
       console.error(error);
@@ -169,6 +215,27 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDisconnect = () => {
+    setSessionActive(false);
+    setLocation(null);
+    setLocationUpdatedAt(null);
+    setCheckIns([]);
+    setMissedClicks(0);
+    setFakeAlerts(0);
+    setBehaviorScore(100);
+    setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
+    setScreen('auth');
+  };
+
+  const handleGoogleAuth = () => {
+    const authUrl = getGoogleAuthUrl();
+    if (authUrl) {
+      window.location.assign(authUrl);
+      return;
+    }
+    setStatus('Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in.');
   };
 
   if (screen === 'splash') {
@@ -198,14 +265,22 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
             </div>
 
             <div className="mb-5 text-center">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-300">Welcome back</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">LifeClick</h2>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-300">{authMode === 'login' ? 'Welcome back' : 'Join LifeClick'}</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{authMode === 'login' ? 'LifeClick' : 'Create account'}</h2>
+            </div>
+
+            <div className="mb-4 flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-xs font-semibold text-violet-100">
+              <button type="button" onClick={() => setAuthMode('login')} className={`flex-1 rounded-full px-3 py-2 ${authMode === 'login' ? 'bg-white text-violet-900' : ''}`}>Sign in</button>
+              <button type="button" onClick={() => setAuthMode('register')} className={`flex-1 rounded-full px-3 py-2 ${authMode === 'register' ? 'bg-white text-violet-900' : ''}`}>Create account</button>
             </div>
 
             <div className="mb-4 grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setAuthMethod('google')}
+                onClick={() => {
+                  setAuthMethod('google');
+                  handleGoogleAuth();
+                }}
                 className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                   authMethod === 'google'
                     ? 'border-violet-600 bg-violet-600 text-white'
@@ -237,6 +312,30 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                   void handleContinue();
                 }}
               >
+                {authMode === 'register' && (
+                  <>
+                    <label className="block text-sm font-medium text-violet-100">
+                      Full name
+                      <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" required className="mt-1 w-full rounded-2xl border border-white/15 bg-white/10 px-3 py-3 text-white outline-none transition placeholder:text-white/40 focus:border-violet-400 focus:bg-white/15" />
+                    </label>
+                    <label className="block text-sm font-medium text-violet-100">
+                      Number
+                      <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Your phone number" required className="mt-1 w-full rounded-2xl border border-white/15 bg-white/10 px-3 py-3 text-white outline-none transition placeholder:text-white/40 focus:border-violet-400 focus:bg-white/15" />
+                    </label>
+                    <label className="block text-sm font-medium text-violet-100">
+                      Address
+                      <textarea value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Your address" required rows={2} className="mt-1 w-full rounded-2xl border border-white/15 bg-white/10 px-3 py-3 text-white outline-none transition placeholder:text-white/40 focus:border-violet-400 focus:bg-white/15" />
+                    </label>
+                    <div className="rounded-2xl border border-violet-300/20 bg-violet-400/10 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-200">Trusted contact</p>
+                      <div className="mt-2 space-y-2">
+                        <input value={trustedContactName} onChange={(event) => setTrustedContactName(event.target.value)} placeholder="Contact name" className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40 focus:border-violet-400" />
+                        <input type="tel" value={trustedContactPhone} onChange={(event) => setTrustedContactPhone(event.target.value)} placeholder="Contact number" className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40 focus:border-violet-400" />
+                        <input value={trustedContactRelation} onChange={(event) => setTrustedContactRelation(event.target.value)} placeholder="Relationship" className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40 focus:border-violet-400" />
+                      </div>
+                    </div>
+                  </>
+                )}
                 <label className="block text-sm font-medium text-violet-100">
                   Email
                   <input
@@ -264,7 +363,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                   disabled={isSubmitting}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmitting ? 'Authenticating…' : 'Continue'}
+                  {isSubmitting ? 'Working…' : authMode === 'register' ? 'Create account' : 'Continue'}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </form>
@@ -272,12 +371,12 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
               <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => void handleContinue()}
+                  onClick={handleGoogleAuth}
                   disabled={isSubmitting}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <Globe className="h-4 w-4" />
-                  {isSubmitting ? 'Connecting…' : 'Continue with Google'}
+                  {isSubmitting ? 'Connecting…' : authMode === 'register' ? 'Create with Google' : 'Continue with Google'}
                 </button>
 
                 <button
@@ -332,8 +431,8 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                 transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
                 className="flex flex-1 flex-col overflow-hidden"
               >
-                {active === 'map' && <MapScreen userId={userId} />}
-                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} onCheckIn={handleCheckIn} />}
+                {active === 'map' && <MapScreen location={location} updatedAt={locationUpdatedAt} />}
+                {active === 'clicker' && <ClickerScreen clickMinutes={clickMinutes} remind={remind} nextCheckInAt={nextCheckInAt} onCheckIn={handleCheckIn} />}
                 {active === 'faf' && <FafScreen />}
                 {active === 'feeds' && <FeedsScreen />}
                 {active === 'risk' && <RiskDashboard checkIns={checkIns} missedClicks={missedClicks} fakeAlerts={fakeAlerts} behaviorScore={behaviorScore} nextCheckInAt={nextCheckInAt} onFalseAlert={handleFalseAlert} />}
@@ -345,6 +444,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                     onClickMinutesChange={setClickMinutes}
                     remind={remind}
                     onRemindChange={setRemind}
+                    onDisconnect={handleDisconnect}
                   />
                 )}
               </motion.div>

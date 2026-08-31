@@ -44,4 +44,5 @@ export interface Profile {
   role: string;
   postsEnabled: boolean;
   feedsEnabled: boolean;
+  trustedContacts: Array<{ name: string; phone: string; relation: string }>;
 }
