@@ -85,7 +85,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
-  const safeEmail = String(email).trim();
+  const safeEmail = String(email).trim().toLowerCase();
   let user = {
     id: 'user-demo-1',
     name: method === 'google' ? 'Ava Brooks' : 'LifeClick User',
@@ -96,17 +96,34 @@ app.post('/api/auth/login', async (req, res) => {
   if (pool) {
     try {
       const result = await pool.query(
-        `INSERT INTO users (email, name, phone, password_hash, created_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id, email, name`,
-        [safeEmail, user.name, '+1-555-0100', password]
+        `SELECT id, email, name, phone, address, faf_id
+         FROM users
+         WHERE email = $1 AND password_hash = $2`,
+        [safeEmail, password]
       );
-      if (result.rows[0]) {
-        user = { ...user, id: result.rows[0].id, email: result.rows[0].email, name: result.rows[0].name };
+      if (!result.rows[0]) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
       }
+      const savedUser = result.rows[0];
+      const contacts = await pool.query(
+        `SELECT name, phone, relationship AS relation
+         FROM trusted_contacts
+         WHERE user_id = $1
+         ORDER BY created_at ASC`,
+        [savedUser.id]
+      );
+      user = {
+        ...user,
+        id: savedUser.id,
+        email: savedUser.email,
+        name: savedUser.name,
+        phone: savedUser.phone,
+        address: savedUser.address,
+        fafId: savedUser.faf_id,
+      };
+      return res.json({ ok: true, user, trustedContacts: contacts.rows });
     } catch (error) {
-      console.warn('User insert skipped:', error.message);
+      return res.status(500).json({ error: 'Unable to verify account details.' });
     }
   }
 

@@ -32,7 +32,6 @@ interface SettingsScreenProps {
   onClickMinutesChange: (next: number) => void;
   remind: boolean;
   onRemindChange: (next: boolean) => void;
-  onDisconnect: () => void;
 }
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
@@ -76,7 +75,6 @@ export function SettingsScreen({
   onClickMinutesChange,
   remind,
   onRemindChange,
-  onDisconnect,
 }: SettingsScreenProps) {
   const { theme, toggleTheme } = useTheme();
   const [twoFactor, setTwoFactor] = useState(false);
@@ -294,13 +292,9 @@ export function SettingsScreen({
           <ChevronRightIcon className="h-5 w-5 shrink-0 text-white/60" aria-hidden="true" />
         </button>
 
-        <button
-          type="button"
-          onClick={onDisconnect}
-          className="flex w-full items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-        >
-          Disconnect session and stop monitoring
-        </button>
+        <p className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-relaxed text-violet-800 dark:border-white/10 dark:bg-white/5 dark:text-violet-200">
+          Location and notification permissions are managed in your device or browser settings.
+        </p>
       </div>
 
       <TrustedContactsSheet open={contactsOpen} onClose={() => setContactsOpen(false)} />

@@ -36,7 +36,7 @@ export async function login(email: string, password: string, method: 'google' | 
 
   const data = await response.json();
   if (!response.ok) throw new Error(data?.error || 'Unable to sign in');
-  return data as { ok: true; user: AuthUser };
+  return data as { ok: true; user: AuthUser; trustedContacts?: RegistrationPayload['trustedContacts'] };
 }
 
 export async function register(payload: RegistrationPayload) {

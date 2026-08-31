@@ -202,7 +202,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
           phone: authData.user.phone || phone || prev.phone,
           address: authData.user.address || address || prev.address,
           fafId: authData.user.fafId || prev.fafId,
-          trustedContacts: authMode === 'register' ? contact : prev.trustedContacts,
+          trustedContacts: authMode === 'register' ? contact : authData.trustedContacts || prev.trustedContacts,
         }));
       }
 
@@ -210,23 +210,11 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
       setScreen('app');
     } catch (error) {
       console.error(error);
-      setStatus('Permission check finished. You can continue in fallback mode.');
-      setScreen('app');
+      setStatus(error instanceof Error ? error.message : 'Unable to complete authentication. Check the API and database configuration.');
+      setScreen('auth');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleDisconnect = () => {
-    setSessionActive(false);
-    setLocation(null);
-    setLocationUpdatedAt(null);
-    setCheckIns([]);
-    setMissedClicks(0);
-    setFakeAlerts(0);
-    setBehaviorScore(100);
-    setNextCheckInAt(Date.now() + clickMinutes * 60 * 1000);
-    setScreen('auth');
   };
 
   const handleGoogleAuth = () => {
@@ -444,7 +432,6 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
                     onClickMinutesChange={setClickMinutes}
                     remind={remind}
                     onRemindChange={setRemind}
-                    onDisconnect={handleDisconnect}
                   />
                 )}
               </motion.div>
