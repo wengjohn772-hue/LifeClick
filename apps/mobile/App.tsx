@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -13,6 +14,7 @@ type Tab = 'checkin' | 'map' | 'faf' | 'feeds' | 'safety' | 'settings';
 type User = { id: string | number; name: string; email: string; phone?: string; address?: string; fafId?: string };
 const BACKGROUND_LOCATION_TASK = 'lifeclick-background-location';
 let activeUserId: string | number | undefined;
+const SESSION_KEY = 'lifeclick.session';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
@@ -22,15 +24,26 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data) return;
   const locations = (data as { locations?: Location.LocationObject[] }).locations || [];
   const latest = locations[locations.length - 1];
-  if (latest && activeUserId) {
-    await saveLocation({ userId: activeUserId, latitude: latest.coords.latitude, longitude: latest.coords.longitude, accuracy: latest.coords.accuracy ?? 0, status: 'background' });
+  const storedSession = await SecureStore.getItemAsync(SESSION_KEY);
+  const storedUser = storedSession ? JSON.parse(storedSession) as { id?: string | number } : null;
+  const userId = activeUserId ?? storedUser?.id;
+  if (latest && userId) {
+    await saveLocation({ userId, latitude: latest.coords.latitude, longitude: latest.coords.longitude, accuracy: latest.coords.accuracy ?? 0, status: 'background' });
   }
 });
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const authenticateUser = (nextUser: User) => { activeUserId = nextUser.id; setUser(nextUser); };
-  const logout = () => { activeUserId = undefined; setUser(null); };
+  useEffect(() => {
+    void SecureStore.getItemAsync(SESSION_KEY).then((storedSession) => {
+      if (!storedSession) return;
+      const storedUser = JSON.parse(storedSession) as User;
+      activeUserId = storedUser.id;
+      setUser(storedUser);
+    }).catch(() => undefined);
+  }, []);
+  const authenticateUser = (nextUser: User) => { activeUserId = nextUser.id; setUser(nextUser); void SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextUser)); };
+  const logout = () => { activeUserId = undefined; void SecureStore.deleteItemAsync(SESSION_KEY); setUser(null); };
   return user ? <MobileShell user={user} onLogout={logout} /> : <AuthScreen onAuthenticated={authenticateUser} />;
 }
 
@@ -141,7 +154,7 @@ function MobileShell({ user, onLogout }: { user: User; onLogout: () => void }) {
     return () => { cancelled = true; subscription?.remove(); void Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then((started) => { if (started) return Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK); }); };
   }, []);
 
-  useEffect(() => { void scheduleReminder(checkInAt); }, [checkInAt]);
+  useEffect(() => { void scheduleReminder(checkInAt); return () => { void Notifications.cancelAllScheduledNotificationsAsync(); }; }, [checkInAt]);
 
   const remaining = Math.max(0, Math.ceil((checkInAt - now) / 1000));
   const checkIn = () => { const at = new Date(); setLastCheckIn(at); setCheckInAt(Date.now() + 30 * 60 * 1000); };
