@@ -1,18 +1,37 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import * as TaskManager from 'expo-task-manager';
 import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { authenticate, TrustedContact } from './lib/api';
+import { authenticate, saveLocation, TrustedContact } from './lib/api';
 
 type AuthMode = 'login' | 'register';
 type Tab = 'checkin' | 'map' | 'faf' | 'feeds' | 'safety' | 'settings';
 
 type User = { id: string | number; name: string; email: string; phone?: string; address?: string; fafId?: string };
+const BACKGROUND_LOCATION_TASK = 'lifeclick-background-location';
+let activeUserId: string | number | undefined;
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
+});
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error || !data) return;
+  const locations = (data as { locations?: Location.LocationObject[] }).locations || [];
+  const latest = locations[locations.length - 1];
+  if (latest && activeUserId) {
+    await saveLocation({ userId: activeUserId, latitude: latest.coords.latitude, longitude: latest.coords.longitude, accuracy: latest.coords.accuracy ?? 0, status: 'background' });
+  }
+});
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  return user ? <MobileShell user={user} onLogout={() => setUser(null)} /> : <AuthScreen onAuthenticated={setUser} />;
+  const authenticateUser = (nextUser: User) => { activeUserId = nextUser.id; setUser(nextUser); };
+  const logout = () => { activeUserId = undefined; setUser(null); };
+  return user ? <MobileShell user={user} onLogout={logout} /> : <AuthScreen onAuthenticated={authenticateUser} />;
 }
 
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
@@ -87,7 +106,17 @@ function MobileShell({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [locationMessage, setLocationMessage] = useState('Location is waiting for permission.');
 
+  const scheduleReminder = async (deadline: number) => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    const secondsUntilReminder = Math.max(1, Math.floor((deadline - Date.now()) / 1000) - 5 * 60);
+    await Notifications.scheduleNotificationAsync({
+      content: { title: 'LifeClick reminder', body: 'Your safety check-in is due in five minutes.', sound: 'default' },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsUntilReminder, repeats: false },
+    });
+  };
+
   useEffect(() => {
+    void Notifications.requestPermissionsAsync();
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -101,9 +130,15 @@ function MobileShell({ user, onLogout }: { user: User; onLogout: () => void }) {
       if (permission.status !== Location.PermissionStatus.GRANTED) { setLocationMessage('Allow location in device settings to show your position.'); return; }
       setLocationMessage('Live location monitoring is active.');
       subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 15000, distanceInterval: 10 }, setLocation);
+      const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundPermission.status === Location.PermissionStatus.GRANTED) {
+        await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, { accuracy: Location.Accuracy.Balanced, timeInterval: 60000, distanceInterval: 50, showsBackgroundLocationIndicator: true, foregroundService: { notificationTitle: 'LifeClick location active', notificationBody: 'Safety monitoring is running.' } });
+      }
     })();
-    return () => { cancelled = true; subscription?.remove(); };
+    return () => { cancelled = true; subscription?.remove(); void Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then((started) => { if (started) return Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK); }); };
   }, []);
+
+  useEffect(() => { void scheduleReminder(checkInAt); }, [checkInAt]);
 
   const remaining = Math.max(0, Math.ceil((checkInAt - now) / 1000));
   const checkIn = () => { const at = new Date(); setLastCheckIn(at); setCheckInAt(Date.now() + 30 * 60 * 1000); };

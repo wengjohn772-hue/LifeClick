@@ -39,3 +39,15 @@ export async function authenticate(payload: {
   if (!response.ok) throw new Error(data?.error || `API request failed (${response.status})`);
   return data as { ok: true; user: AuthUser; trustedContacts?: TrustedContact[]; saved?: boolean; message?: string };
 }
+
+export async function saveLocation(payload: { userId: string | number; latitude: number; longitude: number; accuracy: number; status: string }) {
+  const response = await fetch(`${API_BASE_URL}/api/location`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await response.json() : null;
+  if (!response.ok) throw new Error(data?.error || `Location request failed (${response.status})`);
+  return data as { ok: boolean; saved: boolean };
+}
