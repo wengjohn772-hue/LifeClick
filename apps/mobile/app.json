@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "LifeClick",
+    "slug": "lifeclick",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "lifeclick",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.lifeclick.app",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.lifeclick.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
