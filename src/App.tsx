@@ -127,7 +127,8 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
         };
         setLocation(nextLocation);
         setLocationUpdatedAt(new Date());
-        void saveLocation({ userId, ...nextLocation, status: 'live' }).catch(() => undefined);
+        // The server derives the user from the access token, so no ID is sent.
+        void saveLocation({ ...nextLocation, status: 'live' }).catch(() => undefined);
       },
       () => undefined,
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
