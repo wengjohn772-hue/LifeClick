@@ -1,0 +1,105 @@
+import { Platform, StyleSheet } from 'react-native';
+
+export const colors = {
+  brand: '#6d28d9',
+  brandDark: '#5b21b6',
+  brandTint: '#f0e8ff',
+  brandSoft: '#f4effb',
+  ink: '#24152e',
+  inkStrong: '#34104d',
+  body: '#6d6174',
+  muted: '#8e8197',
+  faint: '#a99caf',
+  line: '#e9def4',
+  lineSoft: '#e8dcf5',
+  surface: '#ffffff',
+  canvas: '#f7f4fb',
+  night: '#08050d',
+  nightCard: '#1c1229',
+  nightLine: '#3b2750',
+  lilac: '#c4b5fd',
+  danger: '#be123c',
+  dangerSoft: '#fee2e2',
+  safe: '#047857',
+  warn: '#b45309',
+} as const;
+
+export const riskColor = (score: number) =>
+  score >= 70 ? colors.danger : score >= 35 ? colors.warn : colors.safe;
+
+/** Styles shared across more than one screen. */
+export const shared = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.night },
+  appSafe: { flex: 1, backgroundColor: colors.canvas },
+  flex: { flex: 1 },
+  appBody: { flex: 1 },
+  screenContent: { flexGrow: 1, padding: 24, paddingTop: 28, paddingBottom: 28 },
+  screenEyebrow: {
+    color: colors.brand,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  screenTitle: { color: colors.ink, fontSize: 34, fontWeight: '800', marginTop: 5 },
+  screenSubtitle: { color: colors.body, fontSize: 15, lineHeight: 23, marginTop: 8 },
+  card: {
+    marginTop: 26,
+    padding: 22,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  cardHint: { color: '#7d7183', fontSize: 13, lineHeight: 19, marginTop: 6 },
+  formCard: {
+    marginTop: 16,
+    padding: 18,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  primaryButton: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    borderRadius: 15,
+    backgroundColor: colors.brand,
+  },
+  primaryText: { color: colors.surface, fontSize: 16, fontWeight: '800' },
+  pressed: { opacity: 0.84 },
+  disabled: { opacity: 0.55 },
+  message: {
+    color: colors.brandDark,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  errorMessage: { color: colors.danger },
+  sectionSpacer: { height: 18 },
+});
+
+export const tabBarStyles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 4 : 10,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+  },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 12 },
+  tabActive: { backgroundColor: colors.brandTint },
+  icon: { color: colors.faint, fontSize: 19 },
+  iconActive: { color: colors.brand },
+  label: { color: colors.muted, fontSize: 10, marginTop: 3 },
+  labelActive: { color: colors.brand, fontWeight: '800' },
+});

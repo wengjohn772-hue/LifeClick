@@ -10,21 +10,38 @@
       [
         "expo-notifications",
         {
-          "color": "#6d28d9"
+          "color": "#6d28d9",
+          "defaultChannel": "safety-alerts"
         }
       ],
       [
         "expo-location",
         {
           "locationWhenInUsePermission": "LifeClick uses your location to show your safety position.",
-          "locationAlwaysAndWhenInUsePermission": "LifeClick uses your location in the background for safety monitoring."
+          "locationAlwaysAndWhenInUsePermission": "LifeClick uses your location in the background so your trusted contacts can be alerted if you stop checking in.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#08050d"
         }
       ]
     ],
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.lifeclick.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.lifeclick.app",
