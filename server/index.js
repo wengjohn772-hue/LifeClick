@@ -1,222 +1,116 @@
 import express from 'express';
 import cors from 'cors';
-import pg from 'pg';
-import { readFileSync } from 'node:fs';
-import 'dotenv/config';
+import rateLimit from 'express-rate-limit';
+import { config } from './config.js';
+import { pool, hasDatabase } from './db/pool.js';
+import { ensureSchema } from './db/migrate.js';
+import { authRouter } from './routes/auth.js';
+import { locationRouter } from './routes/location.js';
+import { contactsRouter } from './routes/contacts.js';
+import { profileRouter } from './routes/profile.js';
+import { checkInsRouter } from './routes/checkins.js';
+import { settingsRouter } from './routes/settings.js';
+import { feedsRouter } from './routes/feeds.js';
+import { pushRouter } from './routes/push.js';
+import { securityRouter } from './routes/security.js';
+import { jobsRouter } from './routes/jobs.js';
+import { notFound, errorHandler, asyncRoute } from './middleware/errors.js';
+import { accessLogger } from './lib/audit.js';
 
-const { Pool } = pg;
 const app = express();
-const PORT = Number(process.env.PORT || 4000);
-const databaseUrl = process.env.DATABASE_URL;
 
-app.use(cors());
-app.use(express.json());
+app.set('trust proxy', 1);
 
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
-const schemaSql = readFileSync(new URL('./db/schema.sql', import.meta.url), 'utf8');
-let databaseInitialization;
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Native apps and server-to-server calls send no Origin header; only
+      // browser requests are constrained by the allowlist.
+      if (!origin) return callback(null, true);
+      if (config.allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
 
-function initializeDatabase() {
-  if (!pool) return Promise.resolve();
-  if (!databaseInitialization) {
-    databaseInitialization = pool.query(schemaSql).catch((error) => {
-      databaseInitialization = undefined;
-      console.warn('Database schema initialization skipped:', error.message);
-    });
-  }
-  return databaseInitialization;
-}
+app.use(express.json({ limit: '100kb' }));
 
-app.use(async (_req, _res, next) => {
-  await initializeDatabase();
-  next();
-});
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 240,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Slow down.', code: 'rate_limited' },
+  })
+);
 
-app.get('/api/health', async (_req, res) => {
-  if (!pool) {
-    return res.json({ ok: true, database: 'not-configured' });
-  }
+// Migrations run once per process, before the first request touches a table.
+app.use(
+  asyncRoute(async (_req, _res, next) => {
+    await ensureSchema();
+    next();
+  })
+);
 
-  try {
-    await pool.query('SELECT 1');
-    res.json({ ok: true, database: 'connected' });
-  } catch (error) {
-    res.status(500).json({ ok: false, database: 'disconnected', error: error.message || 'Unable to connect to PostgreSQL.' });
-  }
-});
-
-app.get('/api/location', (_req, res) => {
-  res.json({
-    userId: 'demo-user',
-    latitude: 40.7128,
-    longitude: -74.006,
-    accuracy: 25,
-    status: 'demo',
-    capturedAt: new Date().toISOString(),
-  });
-});
-
-app.post('/api/location', async (req, res) => {
-  const { userId, latitude, longitude, accuracy, status } = req.body || {};
-
-  if (!userId || !Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) {
-    return res.status(400).json({ error: 'userId, latitude, and longitude are required.' });
-  }
-
-  if (Number(latitude) < -90 || Number(latitude) > 90 || Number(longitude) < -180 || Number(longitude) > 180) {
-    return res.status(400).json({ error: 'Coordinates are outside valid ranges.' });
-  }
-
-  if (!pool) {
-    return res.status(202).json({
-      ok: true,
-      saved: false,
-      message: 'Database not configured. Location accepted in local demo mode.',
-      payload: { userId, latitude, longitude, accuracy, status },
-    });
-  }
-
-  try {
-    await pool.query(
-      `INSERT INTO location_events (user_id, latitude, longitude, accuracy, status, captured_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [userId, Number(latitude), Number(longitude), Number(accuracy) || 0, status || 'live']
-    );
-
-    res.json({ ok: true, saved: true, message: 'Location stored' });
-  } catch (error) {
-    res.status(500).json({ ok: false, saved: false, error: error.message });
-  }
-});
-
-app.get('/api/contacts', (_req, res) => {
-  res.json([
-    { id: 'contact-1', name: 'Maya', phone: '+1-555-0101', relationship: 'Sister' },
-    { id: 'contact-2', name: 'Leo', phone: '+1-555-0102', relationship: 'Friend' },
-    { id: 'contact-3', name: 'Asha', phone: '+1-555-0103', relationship: 'Roommate' },
-  ]);
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password, method } = req.body || {};
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
-  }
-
-  const safeEmail = String(email).trim().toLowerCase();
-  let user = {
-    id: 'user-demo-1',
-    name: method === 'google' ? 'Ava Brooks' : 'LifeClick User',
-    email: safeEmail,
-    provider: method || 'email',
-  };
-
-  if (pool) {
-    try {
-      const result = await pool.query(
-        `SELECT id, email, name, phone, address, faf_id
-         FROM users
-         WHERE email = $1 AND password_hash = $2`,
-        [safeEmail, password]
-      );
-      if (!result.rows[0]) {
-        return res.status(401).json({ error: 'Invalid email or password.' });
-      }
-      const savedUser = result.rows[0];
-      const contacts = await pool.query(
-        `SELECT name, phone, relationship AS relation
-         FROM trusted_contacts
-         WHERE user_id = $1
-         ORDER BY created_at ASC`,
-        [savedUser.id]
-      );
-      user = {
-        ...user,
-        id: savedUser.id,
-        email: savedUser.email,
-        name: savedUser.name,
-        phone: savedUser.phone,
-        address: savedUser.address,
-        fafId: savedUser.faf_id,
-      };
-      return res.json({ ok: true, user, trustedContacts: contacts.rows });
-    } catch (error) {
-      return res.status(500).json({ error: 'Unable to verify account details.' });
-    }
-  }
-
-  res.json({ ok: true, user });
-});
-
-app.post('/api/auth/register', async (req, res) => {
-  const { name, email, password, phone, address, trustedContacts = [] } = req.body || {};
-
-  if (!name || !email || !password || !phone || !address) {
-    return res.status(400).json({ error: 'Full name, email, password, number, and address are required.' });
-  }
-
-  const safeEmail = String(email).trim().toLowerCase();
-  const safeContacts = Array.isArray(trustedContacts)
-    ? trustedContacts.filter((contact) => contact?.name && contact?.phone).slice(0, 5)
-    : [];
-
-  if (!pool) {
-    return res.status(202).json({
-      ok: true,
-      saved: false,
-      user: { id: `user-${Date.now()}`, name: String(name).trim(), email: safeEmail, provider: 'email', fafId: 'FAF-DEMO' },
-      trustedContacts: safeContacts,
-      message: 'Database not configured. Account accepted in local demo mode.',
-    });
-  }
-
-  let client;
-  try {
-    client = await pool.connect();
-    await client.query('BEGIN');
-    const result = await client.query(
-      `INSERT INTO users (email, name, phone, address, faf_id, password_hash, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING id, email, name, phone, address, faf_id`,
-      [safeEmail, String(name).trim(), String(phone).trim(), String(address).trim(), `FAF-${Math.floor(1000 + Math.random() * 9000)}`, password]
-    );
-    const user = result.rows[0];
-    for (const contact of safeContacts) {
-      await client.query(
-        `INSERT INTO trusted_contacts (user_id, name, phone, relationship, created_at)
-         VALUES ($1, $2, $3, $4, NOW())`,
-        [user.id, String(contact.name).trim(), String(contact.phone).trim(), String(contact.relation || 'Trusted contact').trim()]
-      );
-    }
-    await client.query('COMMIT');
-    res.status(201).json({
-      ok: true,
-      saved: true,
-      user: { id: user.id, name: user.name, email: user.email, provider: 'email', phone: user.phone, address: user.address, fafId: user.faf_id },
-      trustedContacts: safeContacts,
-    });
-  } catch (error) {
-    if (client) await client.query('ROLLBACK').catch(() => undefined);
-    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
-      return res.status(202).json({
+app.get(
+  '/api/health',
+  asyncRoute(async (_req, res) => {
+    if (!hasDatabase()) {
+      return res.json({
         ok: true,
-        saved: false,
-        user: { id: `user-${Date.now()}`, name: String(name).trim(), email: safeEmail, provider: 'email', phone: String(phone).trim(), address: String(address).trim(), fafId: 'FAF-DEMO' },
-        trustedContacts: safeContacts,
-        message: 'Database unavailable. Account is active for this session only; start PostgreSQL to persist it.',
+        database: 'not-configured',
+        demoAuth: config.allowDemoAuth,
       });
     }
-    res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'An account with that email already exists.' : error.message });
-  } finally {
-    client?.release();
-  }
-});
+
+    const schema = await ensureSchema();
+    try {
+      await pool.query('SELECT 1');
+      return res.json({
+        ok: schema.ok,
+        database: 'connected',
+        // Surfaced rather than swallowed, so a failed migration is visible.
+        migrations: schema.ok ? 'applied' : `failed: ${schema.reason}`,
+        demoAuth: config.allowDemoAuth,
+      });
+    } catch (error) {
+      return res.status(503).json({ ok: false, database: 'disconnected', error: error.message });
+    }
+  })
+);
+
+// Records every authenticated request. Registered before the routers so the
+// finish handler is attached, but it only writes once requireAuth has
+// identified the user.
+app.use(accessLogger);
+
+app.use('/api/auth', authRouter);
+app.use('/api/location', locationRouter);
+app.use('/api/contacts', contactsRouter);
+app.use('/api/profile', profileRouter);
+app.use('/api/checkins', checkInsRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/feeds', feedsRouter);
+app.use('/api/push-tokens', pushRouter);
+app.use('/api/security', securityRouter);
+app.use('/api/jobs', jobsRouter);
+
+app.use('/api', notFound);
+app.use(errorHandler);
 
 export default app;
 
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`LifeClick backend running on http://localhost:${PORT}`);
+  app.listen(config.port, () => {
+    console.log(`LifeClick backend running on http://localhost:${config.port}`);
+    if (!hasDatabase()) {
+      console.log(
+        config.allowDemoAuth
+          ? '[server] No DATABASE_URL. Demo auth is ENABLED — any credentials will be accepted.'
+          : '[server] No DATABASE_URL. Auth routes will return 503 until one is set.'
+      );
+    }
   });
 }
