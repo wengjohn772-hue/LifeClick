@@ -26,6 +26,14 @@
       ],
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "LifeClick uses your photos so you can attach an image to a community safety report.",
+          "cameraPermission": "LifeClick uses your camera so you can photograph a safety hazard for a community report.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
@@ -45,6 +53,9 @@
     },
     "android": {
       "package": "com.lifeclick.app",
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

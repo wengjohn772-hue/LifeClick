@@ -21,15 +21,39 @@ export interface TrustedContact {
   relation: string;
 }
 
+export type FeedTag = 'Alert' | 'Update' | 'Resolved' | 'Notice';
+
+export const FEED_TAGS: FeedTag[] = ['Alert', 'Update', 'Resolved', 'Notice'];
+
 export interface FeedPost {
   id: string;
   userId: string;
   area: string | null;
+  country: string | null;
+  state: string | null;
   body: string;
-  tag: 'Alert' | 'Update' | 'Resolved' | 'Notice';
+  tag: FeedTag;
   likes: number;
   reposts: number;
+  likedByMe: boolean;
+  repostedByMe: boolean;
+  /** Absolute URL, or an API path that needs the base URL prepended. */
+  imageUrl: string | null;
+  mine: boolean;
   createdAt: string;
+}
+
+export interface FeedRegion {
+  country: string;
+  posts: number;
+  states: Array<{ state: string; posts: number }>;
+}
+
+export interface ReactionResult {
+  likes: number;
+  reposts: number;
+  likedByMe: boolean;
+  repostedByMe: boolean;
 }
 
 export interface SafetySettings {
@@ -37,7 +61,10 @@ export interface SafetySettings {
   remindEnabled: boolean;
   remindBeforeMinutes: number;
   notificationsEnabled: boolean;
+  /** Background location tracking. */
   trackingEnabled: boolean;
+  /** The check-in timer itself, toggled from the Check in tab. */
+  monitoringEnabled: boolean;
 }
 
 export interface CheckInRecord {

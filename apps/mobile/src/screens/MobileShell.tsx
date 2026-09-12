@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
 // react-native's own SafeAreaView is iOS-only and deprecated; on Android it is
 // a no-op, which leaves the tab bar under the system navigation bar now that
 // edge-to-edge is the default.
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { TabBar } from '../components/TabBar';
 import { CheckInScreen } from './CheckInScreen';
 import { MapScreen } from './MapScreen';
@@ -17,7 +17,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { isBackgroundTrackingActive, startBackgroundTracking } from '../lib/locationTask';
 import { saveLocation } from '../lib/api';
 import { useSafety } from '../state/safety';
-import { shared } from '../theme';
+import { useTheme } from '../state/theme';
 import type { Tab } from '../types';
 
 // The position watcher fires far more often than the location history needs.
@@ -25,6 +25,7 @@ import type { Tab } from '../types';
 const FOREGROUND_PERSIST_INTERVAL_MS = 60_000;
 
 export function MobileShell() {
+  const { colors, isDark } = useTheme();
   const { settings, ready, checkIn } = useSafety();
   const [tab, setTab] = useState<Tab>('checkin');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -60,8 +61,7 @@ export function MobileShell() {
           // The map updates on every fix; only the write is throttled.
           setLocation(next);
 
-          const elapsed = Date.now() - lastPersistedAt.current;
-          if (elapsed < FOREGROUND_PERSIST_INTERVAL_MS) return;
+          if (Date.now() - lastPersistedAt.current < FOREGROUND_PERSIST_INTERVAL_MS) return;
           lastPersistedAt.current = Date.now();
 
           void saveLocation({
@@ -94,11 +94,8 @@ export function MobileShell() {
     void enableBackground();
   }, [ready, settings.trackingEnabled, backgroundActive, enableBackground]);
 
-  // Responding to the server's "are you safe?" alert.
-  //
-  // The server opens an incident when a deadline passes and pushes here first;
-  // checking in from the notification resolves it before trusted contacts are
-  // ever alerted, which is the whole point of the grace period.
+  // Responding to the server's "are you safe?" alert. Checking in from the
+  // notification resolves the incident before trusted contacts are alerted.
   useEffect(() => {
     const confirmSafe = () => {
       Alert.alert(
@@ -111,14 +108,12 @@ export function MobileShell() {
       );
     };
 
-    // Tapped the notification from outside the app.
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const type = response.notification.request.content.data?.type;
       if (type === 'check_in_overdue') confirmSafe();
       if (type === 'contact_escalation') setTab('faf');
     });
 
-    // Arrived while the app was open.
     const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       if (notification.request.content.data?.type === 'check_in_overdue') confirmSafe();
     });
@@ -149,9 +144,9 @@ export function MobileShell() {
     );
 
   return (
-    <SafeAreaView style={shared.appSafe}>
-      <StatusBar style="dark" />
-      <View style={shared.appBody}>{content}</View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }} edges={['top', 'bottom']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <View style={{ flex: 1 }}>{content}</View>
       <TabBar active={tab} onChange={setTab} />
     </SafeAreaView>
   );

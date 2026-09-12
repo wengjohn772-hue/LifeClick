@@ -6,7 +6,10 @@ import type {
   ConsentChoices,
   ConsentStatus,
   FeedPost,
+  FeedRegion,
+  FeedTag,
   Incident,
+  ReactionResult,
   SafetySettings,
   SecurityActivity,
   TrustedContact,
@@ -134,6 +137,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   // One transparent retry when the access token has simply aged out.
   if (auth && response.status === 401) {
     const data = await parse(response);
+
     if (data?.code === 'token_expired' || data?.code === 'token_invalid') {
       const refreshed = await refreshTokens();
       if (refreshed) {
@@ -143,6 +147,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         throw new ApiError(data?.error || 'Your session expired. Sign in again.', 401, data?.code);
       }
     } else {
+      // A structurally valid token whose account is gone: refreshing cannot
+      // help, so drop the session rather than retrying forever.
+      if (data?.code === 'account_missing') {
+        await saveTokens(null);
+        onAuthLost?.();
+      }
       throw new ApiError(data?.error || 'Authentication required.', 401, data?.code);
     }
   }
@@ -219,7 +229,36 @@ export const deleteContact = (id: number) =>
 
 /* ----------------------------------------------------------------- feeds */
 
-export const getFeeds = () => apiRequest<{ posts: FeedPost[] }>('/api/feeds');
+/** Image URLs come back as API paths; the base URL is added for display. */
+export const resolveImageUrl = (url: string | null) =>
+  !url ? null : url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+
+export const getFeeds = (filter?: { country?: string; state?: string }) => {
+  const params = new URLSearchParams();
+  if (filter?.country && filter.country !== 'all') params.set('country', filter.country);
+  if (filter?.state && filter.state !== 'all') params.set('state', filter.state);
+  const suffix = params.toString();
+  return apiRequest<{ posts: FeedPost[] }>(`/api/feeds${suffix ? `?${suffix}` : ''}`);
+};
+
+export const getFeedRegions = () => apiRequest<{ regions: FeedRegion[] }>('/api/feeds/regions');
+
+export const getMyPosts = () => apiRequest<{ posts: FeedPost[] }>('/api/feeds/mine');
+
+export const createPost = (payload: {
+  body: string;
+  tag: FeedTag;
+  area?: string;
+  country?: string;
+  state?: string;
+  image?: { base64: string; mimeType?: string; width?: number; height?: number };
+}) => apiRequest<{ post: FeedPost }>('/api/feeds', { method: 'POST', body: payload });
+
+export const deletePost = (id: string) =>
+  apiRequest<{ deleted: boolean }>(`/api/feeds/${id}`, { method: 'DELETE' });
+
+export const reactToPost = (id: string, kind: 'like' | 'repost') =>
+  apiRequest<ReactionResult>(`/api/feeds/${id}/reactions`, { method: 'POST', body: { kind } });
 
 /* -------------------------------------------------------------- check-in */
 

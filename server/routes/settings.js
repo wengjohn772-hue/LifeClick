@@ -15,6 +15,7 @@ const DEFAULTS = {
   remindBeforeMinutes: 5,
   notificationsEnabled: true,
   trackingEnabled: true,
+  monitoringEnabled: true,
 };
 
 function serializeSettings(row) {
@@ -25,6 +26,7 @@ function serializeSettings(row) {
     remindBeforeMinutes: row.remind_before_minutes ?? DEFAULTS.remindBeforeMinutes,
     notificationsEnabled: row.notifications_enabled ?? DEFAULTS.notificationsEnabled,
     trackingEnabled: row.tracking_enabled ?? DEFAULTS.trackingEnabled,
+    monitoringEnabled: row.monitoring_enabled ?? DEFAULTS.monitoringEnabled,
   };
 }
 
@@ -48,14 +50,15 @@ settingsRouter.put(
     const merged = { ...serializeSettings(current[0]), ...req.body };
 
     const { rows } = await query(
-      `INSERT INTO user_settings (user_id, check_in_interval, remind_enabled, remind_before_minutes, notifications_enabled, tracking_enabled, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `INSERT INTO user_settings (user_id, check_in_interval, remind_enabled, remind_before_minutes, notifications_enabled, tracking_enabled, monitoring_enabled, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          check_in_interval = EXCLUDED.check_in_interval,
          remind_enabled = EXCLUDED.remind_enabled,
          remind_before_minutes = EXCLUDED.remind_before_minutes,
          notifications_enabled = EXCLUDED.notifications_enabled,
          tracking_enabled = EXCLUDED.tracking_enabled,
+         monitoring_enabled = EXCLUDED.monitoring_enabled,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -65,14 +68,16 @@ settingsRouter.put(
         merged.remindBeforeMinutes,
         merged.notificationsEnabled,
         merged.trackingEnabled,
+        merged.monitoringEnabled,
       ]
     );
 
-    // Keep the server-owned deadline aligned with the user's chosen interval,
-    // and stop monitoring entirely when they turn tracking off.
+    // Keep the server-owned deadline aligned with the chosen interval, and stop
+    // the sweep when the user pauses their timer — otherwise a deliberate pause
+    // would escalate them to their trusted contacts.
     const safetyState = await updateSafetySchedule(req.user.id, {
       intervalMinutes: req.body.checkInIntervalMinutes ?? null,
-      monitoringEnabled: req.body.trackingEnabled ?? null,
+      monitoringEnabled: req.body.monitoringEnabled ?? null,
     });
 
     return res.json({

@@ -11,6 +11,7 @@ export const StorageKeys = {
   tokens: 'lifeclick.tokens',
   safety: 'lifeclick.safety',
   pushToken: 'lifeclick.pushToken',
+  theme: 'lifeclick.theme',
 } as const;
 
 export async function getItem(key: string): Promise<string | null> {

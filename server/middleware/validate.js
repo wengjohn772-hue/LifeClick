@@ -69,7 +69,10 @@ export const settingsSchema = z.object({
   remindEnabled: z.boolean().optional(),
   remindBeforeMinutes: z.coerce.number().int().min(0).max(120).optional(),
   notificationsEnabled: z.boolean().optional(),
+  // Location tracking and the check-in timer are deliberately separate: pausing
+  // check-ins should not silently disable location monitoring.
   trackingEnabled: z.boolean().optional(),
+  monitoringEnabled: z.boolean().optional(),
 });
 
 export const checkInSchema = z.object({

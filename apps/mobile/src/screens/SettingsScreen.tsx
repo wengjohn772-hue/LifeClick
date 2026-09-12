@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Avatar } from '../components/Avatar';
 import { Field } from '../components/Field';
+import { GradientScreen } from '../components/GradientScreen';
 import { Metric } from '../components/Metric';
 import { useSession } from '../state/session';
 import { INTERVAL_PRESETS, MAX_INTERVAL_MINUTES, formatMinutes, useSafety } from '../state/safety';
+import { useTheme } from '../state/theme';
+import type { ThemePreference } from '../state/theme';
 import { addContact, deleteAccount, deleteContact, getContacts } from '../lib/api';
+import { ProfileScreen } from './ProfileScreen';
 import { SecurityScreen } from './SecurityScreen';
-import { colors, shared } from '../theme';
+import type { Palette } from '../theme';
 import type { TrustedContact } from '../types';
+
+const THEME_OPTIONS: Array<{ id: ThemePreference; label: string; icon: string }> = [
+  { id: 'light', label: 'Light', icon: '☀' },
+  { id: 'dark', label: 'Dark', icon: '☾' },
+  { id: 'system', label: 'Auto', icon: '◐' },
+];
 
 export function SettingsScreen({
   backgroundActive,
@@ -18,10 +29,12 @@ export function SettingsScreen({
   locationMessage: string;
   onEnableBackground: () => void;
 }) {
+  const { colors, shared, preference, setPreference } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, signOut, demoMode } = useSession();
   const { settings, changeInterval, changeSettings } = useSafety();
-  const [securityOpen, setSecurityOpen] = useState(false);
 
+  const [pane, setPane] = useState<'settings' | 'profile' | 'security'>('settings');
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -71,9 +84,7 @@ export function SettingsScreen({
         text: 'Remove',
         style: 'destructive',
         onPress: () => {
-          void deleteContact(contact.id as number)
-            .then(loadContacts)
-            .catch(() => undefined);
+          void deleteContact(contact.id as number).then(loadContacts).catch(() => undefined);
         },
       },
     ]);
@@ -103,39 +114,73 @@ export function SettingsScreen({
   };
 
   const adjustInterval = (delta: number) => {
-    const next = Math.min(MAX_INTERVAL_MINUTES, Math.max(5, settings.checkInIntervalMinutes + delta));
-    void changeInterval(next);
+    void changeInterval(Math.min(MAX_INTERVAL_MINUTES, Math.max(5, settings.checkInIntervalMinutes + delta)));
   };
 
-  if (securityOpen) return <SecurityScreen onBack={() => setSecurityOpen(false)} />;
+  if (pane === 'profile') return <ProfileScreen onBack={() => setPane('settings')} />;
+  if (pane === 'security') return <SecurityScreen onBack={() => setPane('settings')} />;
 
   return (
-    <ScrollView contentContainerStyle={shared.screenContent}>
+    <GradientScreen>
       <Text style={shared.screenEyebrow}>Account</Text>
       <Text style={shared.screenTitle}>Settings</Text>
 
-      <View style={shared.card}>
-        <Text style={styles.profileName}>{user?.name}</Text>
-        <Text style={styles.profileDetail}>{user?.email}</Text>
-        <Text style={styles.profileDetail}>{user?.fafId || 'FaF ID pending'}</Text>
-        {demoMode ? <Text style={styles.demoBadge}>Demo session — not saved to a database</Text> : null}
+      {/* Profile entry point */}
+      <Pressable
+        onPress={() => setPane('profile')}
+        style={({ pressed }) => [styles.profileCard, pressed && shared.pressed]}
+      >
+        <Avatar avatarId={user?.avatarId} name={user?.name} size={56} />
+        <View style={styles.profileMain}>
+          <Text style={styles.profileName} numberOfLines={1}>
+            {user?.name}
+          </Text>
+          <Text style={styles.profileDetail} numberOfLines={1}>
+            {user?.email}
+          </Text>
+          <Text style={styles.profileFaf}>{user?.fafId ?? 'FaF ID pending'}</Text>
+        </View>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+      {demoMode ? <Text style={styles.demoBadge}>Demo session — not saved to a database</Text> : null}
+
+      {/* Appearance */}
+      <Text style={shared.sectionTitle}>Appearance</Text>
+      <Text style={shared.sectionHint}>Auto follows your device&apos;s light or dark setting.</Text>
+      <View style={styles.segment}>
+        {THEME_OPTIONS.map((option) => {
+          const active = preference === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => setPreference(option.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={[styles.segmentItem, active && styles.segmentItemActive]}
+            >
+              <Text style={[styles.segmentIcon, active && styles.segmentTextActive]}>{option.icon}</Text>
+              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{option.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <Text style={styles.sectionTitle}>Set click time</Text>
-      <Text style={styles.sectionHint}>
-        How often you should tap “I&apos;m safe”. Miss it and your trusted contacts are alerted.
+      {/* Check-in timing */}
+      <Text style={shared.sectionTitle}>Set click time</Text>
+      <Text style={shared.sectionHint}>
+        How often you should tap &ldquo;I&apos;m safe&rdquo;. Miss it and your trusted contacts are alerted.
       </Text>
 
       <View style={styles.presetRow}>
         {INTERVAL_PRESETS.map((minutes) => {
-          const isActive = settings.checkInIntervalMinutes === minutes;
+          const active = settings.checkInIntervalMinutes === minutes;
           return (
             <Pressable
               key={minutes}
               onPress={() => void changeInterval(minutes)}
-              style={[styles.preset, isActive && styles.presetActive]}
+              style={[styles.preset, active && styles.presetActive]}
             >
-              <Text style={[styles.presetText, isActive && styles.presetTextActive]}>{formatMinutes(minutes)}</Text>
+              <Text style={[styles.presetText, active && styles.presetTextActive]}>{formatMinutes(minutes)}</Text>
             </Pressable>
           );
         })}
@@ -144,19 +189,11 @@ export function SettingsScreen({
       <View style={styles.stepperRow}>
         <Text style={styles.stepperLabel}>Custom interval</Text>
         <View style={styles.stepper}>
-          <Pressable
-            onPress={() => adjustInterval(-5)}
-            accessibilityLabel="Decrease interval by 5 minutes"
-            style={styles.stepButton}
-          >
+          <Pressable onPress={() => adjustInterval(-5)} accessibilityLabel="Decrease by 5 minutes" style={styles.stepButton}>
             <Text style={styles.stepButtonText}>−</Text>
           </Pressable>
           <Text style={styles.stepValue}>{formatMinutes(settings.checkInIntervalMinutes)}</Text>
-          <Pressable
-            onPress={() => adjustInterval(5)}
-            accessibilityLabel="Increase interval by 5 minutes"
-            style={styles.stepButton}
-          >
+          <Pressable onPress={() => adjustInterval(5)} accessibilityLabel="Increase by 5 minutes" style={styles.stepButton}>
             <Text style={styles.stepButtonText}>+</Text>
           </Pressable>
         </View>
@@ -167,7 +204,7 @@ export function SettingsScreen({
         <Switch
           value={settings.remindEnabled}
           onValueChange={(value) => void changeSettings({ remindEnabled: value })}
-          trackColor={{ true: colors.brand, false: '#d6cde0' }}
+          trackColor={{ true: colors.brand, false: colors.switchTrackOff }}
           thumbColor={colors.surface}
         />
       </View>
@@ -177,13 +214,14 @@ export function SettingsScreen({
         <Switch
           value={settings.notificationsEnabled}
           onValueChange={(value) => void changeSettings({ notificationsEnabled: value })}
-          trackColor={{ true: colors.brand, false: '#d6cde0' }}
+          trackColor={{ true: colors.brand, false: colors.switchTrackOff }}
           thumbColor={colors.surface}
         />
       </View>
 
-      <Text style={styles.sectionTitle}>Trusted contacts</Text>
-      <Text style={styles.sectionHint}>Up to five people who are alerted if you go quiet.</Text>
+      {/* Trusted contacts */}
+      <Text style={shared.sectionTitle}>Trusted contacts</Text>
+      <Text style={shared.sectionHint}>Up to five people who are alerted if you go quiet.</Text>
 
       {contacts.length === 0 ? (
         <Text style={styles.emptyContacts}>No trusted contacts yet.</Text>
@@ -225,7 +263,8 @@ export function SettingsScreen({
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Monitoring</Text>
+      {/* Monitoring */}
+      <Text style={shared.sectionTitle}>Monitoring</Text>
       <Metric
         label="Background location"
         value={backgroundActive ? 'Active' : 'Off'}
@@ -238,9 +277,10 @@ export function SettingsScreen({
         </Pressable>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Privacy &amp; security</Text>
+      {/* Privacy */}
+      <Text style={shared.sectionTitle}>Privacy &amp; security</Text>
       <Pressable
-        onPress={() => setSecurityOpen(true)}
+        onPress={() => setPane('security')}
         style={({ pressed }) => [styles.securityButton, pressed && shared.pressed]}
       >
         <View style={styles.securityMain}>
@@ -259,84 +299,126 @@ export function SettingsScreen({
       <Pressable onPress={confirmDeleteAccount} style={styles.deleteAccount}>
         <Text style={styles.deleteAccountText}>Delete my account</Text>
       </Pressable>
-    </ScrollView>
+    </GradientScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  profileName: { color: colors.inkStrong, fontSize: 22, fontWeight: '800' },
-  profileDetail: { color: colors.body, fontSize: 14, marginTop: 8 },
-  demoBadge: { color: colors.warn, fontSize: 12, fontWeight: '700', marginTop: 12 },
-  sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', marginTop: 28 },
-  sectionHint: { color: colors.body, fontSize: 13, lineHeight: 19, marginTop: 6 },
-  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  preset: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#efeaf5' },
-  presetActive: { backgroundColor: colors.brand },
-  presetText: { color: colors.body, fontSize: 13, fontWeight: '700' },
-  presetTextActive: { color: colors.surface },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 14,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: colors.brandSoft,
-  },
-  stepperLabel: { color: colors.body, fontSize: 14 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-  },
-  stepButtonText: { color: colors.inkStrong, fontSize: 20, fontWeight: '800', lineHeight: 22 },
-  stepValue: { color: colors.inkStrong, fontSize: 14, fontWeight: '800', minWidth: 64, textAlign: 'center' },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  toggleLabel: { color: colors.body, fontSize: 15, flex: 1, paddingRight: 12 },
-  emptyContacts: { color: colors.muted, fontSize: 14, marginTop: 14 },
-  hintSmall: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
-  secondaryButton: {
-    marginTop: 14,
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.brand,
-  },
-  secondaryText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
-  securityButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 14,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: colors.brandSoft,
-    borderWidth: 1,
-    borderColor: colors.lineSoft,
-  },
-  securityMain: { flex: 1, paddingRight: 12 },
-  securityTitle: { color: colors.inkStrong, fontSize: 15, fontWeight: '800' },
-  securitySub: { color: colors.body, fontSize: 12, lineHeight: 18, marginTop: 4 },
-  chevron: { color: colors.brand, fontSize: 24, fontWeight: '700' },
-  logoutButton: {
-    alignItems: 'center',
-    marginTop: 28,
-    padding: 16,
-    borderRadius: 15,
-    backgroundColor: colors.dangerSoft,
-  },
-  logoutText: { color: colors.danger, fontWeight: '800' },
-  deleteAccount: { alignItems: 'center', marginTop: 14, padding: 8 },
-  deleteAccountText: { color: colors.muted, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
-});
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
+    profileCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginTop: 22,
+      padding: 16,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    profileMain: { flex: 1 },
+    profileName: { color: colors.inkStrong, fontSize: 18, fontWeight: '800' },
+    profileDetail: { color: colors.body, fontSize: 13, marginTop: 3 },
+    profileFaf: { color: colors.brand, fontSize: 12, fontWeight: '800', marginTop: 5, letterSpacing: 0.5 },
+    chevron: { color: colors.brand, fontSize: 24, fontWeight: '700' },
+    demoBadge: { color: colors.warn, fontSize: 12, fontWeight: '700', marginTop: 10 },
+
+    segment: {
+      flexDirection: 'row',
+      marginTop: 14,
+      padding: 4,
+      borderRadius: 16,
+      backgroundColor: colors.brandSoft,
+      borderWidth: 1,
+      borderColor: colors.lineSoft,
+    },
+    segmentItem: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 3,
+      paddingVertical: 10,
+      borderRadius: 12,
+    },
+    segmentItemActive: { backgroundColor: colors.brand },
+    segmentIcon: { color: colors.body, fontSize: 16 },
+    segmentText: { color: colors.body, fontSize: 12, fontWeight: '700' },
+    segmentTextActive: { color: colors.onBrand },
+
+    presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+    preset: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.brandSoft },
+    presetActive: { backgroundColor: colors.brand },
+    presetText: { color: colors.body, fontSize: 13, fontWeight: '700' },
+    presetTextActive: { color: colors.onBrand },
+
+    stepperRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      padding: 12,
+      borderRadius: 16,
+      backgroundColor: colors.brandSoft,
+    },
+    stepperLabel: { color: colors.body, fontSize: 14 },
+    stepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    stepButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    stepButtonText: { color: colors.inkStrong, fontSize: 20, fontWeight: '800', lineHeight: 22 },
+    stepValue: { color: colors.inkStrong, fontSize: 14, fontWeight: '800', minWidth: 64, textAlign: 'center' },
+
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.line,
+    },
+    toggleLabel: { color: colors.body, fontSize: 15, flex: 1, paddingRight: 12 },
+
+    emptyContacts: { color: colors.muted, fontSize: 14, marginTop: 14 },
+    hintSmall: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
+
+    secondaryButton: {
+      marginTop: 14,
+      alignItems: 'center',
+      paddingVertical: 14,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: colors.brand,
+    },
+    secondaryText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+
+    securityButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 14,
+      padding: 16,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    securityMain: { flex: 1, paddingRight: 12 },
+    securityTitle: { color: colors.inkStrong, fontSize: 15, fontWeight: '800' },
+    securitySub: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 },
+
+    logoutButton: {
+      alignItems: 'center',
+      marginTop: 28,
+      padding: 16,
+      borderRadius: 15,
+      backgroundColor: colors.dangerSoft,
+    },
+    logoutText: { color: colors.onDangerSoft, fontWeight: '800' },
+    deleteAccount: { alignItems: 'center', marginTop: 14, padding: 8 },
+    deleteAccountText: { color: colors.muted, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  });

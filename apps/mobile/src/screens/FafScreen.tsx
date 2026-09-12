@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Field } from '../components/Field';
+import { GradientScreen } from '../components/GradientScreen';
 import { Metric } from '../components/Metric';
 import { useSession } from '../state/session';
-import { colors, shared } from '../theme';
+import { useTheme } from '../state/theme';
+import type { Palette } from '../theme';
 
 // Peer presence is not yet a backend capability — connecting by FaF ID needs
-// the Phase 3 escalation service. These are clearly labelled as a preview so
-// the screen does not imply live tracking that is not happening.
+// the shared safety service. These are clearly labelled as a preview so the
+// screen does not imply live tracking that is not happening.
 const PREVIEW_FRIENDS = [
   { alias: 'Blue Kite', detail: '400 m · Safe' },
   { alias: 'Night Owl', detail: '2.1 km · Safe' },
@@ -15,7 +17,10 @@ const PREVIEW_FRIENDS = [
 ];
 
 export function FafScreen() {
+  const { colors, shared } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useSession();
+
   const [friendId, setFriendId] = useState('');
   const [connected, setConnected] = useState<string[]>([]);
   const [message, setMessage] = useState('');
@@ -39,7 +44,7 @@ export function FafScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={shared.screenContent}>
+    <GradientScreen>
       <Text style={shared.screenEyebrow}>Safety circle</Text>
       <Text style={shared.screenTitle}>Find a Friend</Text>
       <Text style={shared.screenSubtitle}>Connect by FaF ID to share live safety status.</Text>
@@ -67,11 +72,7 @@ export function FafScreen() {
         <Pressable
           onPress={connect}
           disabled={!friendId.trim()}
-          style={({ pressed }) => [
-            shared.primaryButton,
-            pressed && shared.pressed,
-            !friendId.trim() && shared.disabled,
-          ]}
+          style={({ pressed }) => [shared.primaryButton, pressed && shared.pressed, !friendId.trim() && shared.disabled]}
         >
           <Text style={shared.primaryText}>Connect friend</Text>
         </Pressable>
@@ -80,40 +81,34 @@ export function FafScreen() {
 
       {connected.length > 0 ? (
         <>
-          <Text style={styles.sectionTitle}>Connected</Text>
+          <Text style={shared.sectionTitle}>Connected</Text>
           {connected.map((id) => (
             <Metric key={id} label={id} value="Pending sync" />
           ))}
         </>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Preview</Text>
+      <Text style={shared.sectionTitle}>Preview</Text>
       {PREVIEW_FRIENDS.map((friend) => (
         <Metric key={friend.alias} label={friend.alias} value={friend.detail} />
       ))}
       <Text style={styles.previewNote}>
         Sample data. Live friend status arrives with the shared safety service.
       </Text>
-    </ScrollView>
+    </GradientScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  idCard: {
-    marginTop: 26,
-    padding: 22,
-    borderRadius: 24,
-    backgroundColor: colors.brandSoft,
-    borderWidth: 1,
-    borderColor: colors.lineSoft,
-  },
-  idValue: { color: colors.inkStrong, fontSize: 28, fontWeight: '800', marginTop: 8, letterSpacing: 1 },
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: '800',
-    marginTop: 26,
-    marginBottom: 4,
-  },
-  previewNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 14 },
-});
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
+    idCard: {
+      marginTop: 24,
+      padding: 20,
+      borderRadius: 24,
+      backgroundColor: colors.brandSoft,
+      borderWidth: 1,
+      borderColor: colors.lineSoft,
+    },
+    idValue: { color: colors.inkStrong, fontSize: 28, fontWeight: '800', marginTop: 8, letterSpacing: 1 },
+    previewNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 14 },
+  });

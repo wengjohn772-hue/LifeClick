@@ -1,21 +1,29 @@
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { SessionProvider, useSession } from './src/state/session';
 import { SafetyProvider } from './src/state/safety';
+import { ThemeProvider, useTheme } from './src/state/theme';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ConsentScreen } from './src/screens/ConsentScreen';
 import { MobileShell } from './src/screens/MobileShell';
-import { colors } from './src/theme';
 
 function Root() {
   const { user, restoring, consentCurrent, termsVersion, refreshConsent } = useSession();
+  const { gradient, colors } = useTheme();
 
   if (restoring) {
     return (
       <View style={styles.splash}>
-        <StatusBar style="light" />
-        <ActivityIndicator color={colors.lilac} size="large" />
+        <LinearGradient
+          colors={gradient.screen}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <StatusBar style="auto" />
+        <ActivityIndicator color={colors.brand} size="large" />
       </View>
     );
   }
@@ -42,13 +50,15 @@ function Root() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <SessionProvider>
-        <Root />
-      </SessionProvider>
+      <ThemeProvider>
+        <SessionProvider>
+          <Root />
+        </SessionProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.night },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

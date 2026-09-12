@@ -34,7 +34,15 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '100kb' }));
+// Bodies stay small everywhere except the feeds router, which accepts
+// base64-encoded images and installs its own larger parser. Skipping it here
+// matters: whichever parser runs first consumes the stream, so a global 100kb
+// limit would reject an image upload before the feeds router ever saw it.
+const parseJson = express.json({ limit: '100kb' });
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/feeds')) return next();
+  return parseJson(req, res, next);
+});
 
 app.use(
   rateLimit({

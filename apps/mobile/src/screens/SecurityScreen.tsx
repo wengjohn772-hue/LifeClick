@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GradientScreen } from '../components/GradientScreen';
 import { getSecurityActivity, withdrawConsent } from '../lib/api';
 import { useSession } from '../state/session';
-import { colors, shared } from '../theme';
+import { useTheme } from '../state/theme';
+import type { Palette } from '../theme';
 import type { SecurityActivity } from '../types';
 
 const EVENT_LABEL: Record<string, string> = {
@@ -16,8 +18,7 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 function when(iso: string) {
-  const delta = Date.now() - new Date(iso).getTime();
-  const minutes = Math.round(delta / 60_000);
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
@@ -31,7 +32,10 @@ function when(iso: string) {
  * an unrecognised sign-in actionable.
  */
 export function SecurityScreen({ onBack }: { onBack: () => void }) {
+  const { colors, shared } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { signOut } = useSession();
+
   const [activity, setActivity] = useState<SecurityActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,21 +84,15 @@ export function SecurityScreen({ onBack }: { onBack: () => void }) {
   const failedAttempts = activity?.events.filter((event) => event.outcome === 'failure').length ?? 0;
 
   return (
-    <ScrollView
-      contentContainerStyle={shared.screenContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-          tintColor={colors.brand}
-        />
-      }
+    <GradientScreen
+      refreshing={refreshing}
+      onRefresh={async () => {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+      }}
     >
-      <Pressable onPress={onBack} style={styles.back}>
+      <Pressable onPress={onBack} hitSlop={10} style={styles.back}>
         <Text style={styles.backText}>‹ Settings</Text>
       </Pressable>
 
@@ -115,42 +113,32 @@ export function SecurityScreen({ onBack }: { onBack: () => void }) {
                   ? '1 failed sign-in attempt on record'
                   : `${failedAttempts} failed sign-in attempts on record`}
               </Text>
-              <Text style={styles.warningBody}>
-                If you do not recognise these, change your password.
-              </Text>
+              <Text style={styles.warningBody}>If you do not recognise these, change your password.</Text>
             </View>
           ) : null}
 
-          <Text style={styles.sectionTitle}>Recent account events</Text>
+          <Text style={shared.sectionTitle}>Recent account events</Text>
           {activity?.events.length === 0 ? (
             <Text style={styles.empty}>No events recorded yet.</Text>
           ) : (
             activity?.events.map((event, index) => (
               <View key={`${event.at}-${index}`} style={styles.row}>
-                <View style={styles.rowMain}>
-                  <Text style={[styles.rowTitle, event.outcome === 'failure' && styles.rowTitleBad]}>
-                    {EVENT_LABEL[event.type] ?? event.type}
-                  </Text>
-                  <Text style={styles.rowMeta}>
-                    {[event.ip, when(event.at)].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
+                <Text style={[styles.rowTitle, event.outcome === 'failure' && { color: colors.danger }]}>
+                  {EVENT_LABEL[event.type] ?? event.type}
+                </Text>
+                <Text style={styles.rowMeta}>{[event.ip, when(event.at)].filter(Boolean).join(' · ')}</Text>
               </View>
             ))
           )}
 
-          <Text style={styles.sectionTitle}>Networks used (last 7 days)</Text>
+          <Text style={shared.sectionTitle}>Networks used (last 7 days)</Text>
           {activity?.requestSummary.length === 0 ? (
             <Text style={styles.empty}>No requests recorded yet.</Text>
           ) : (
             activity?.requestSummary.map((entry) => (
               <View key={entry.ip ?? 'unknown'} style={styles.row}>
-                <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{entry.ip ?? 'Unknown address'}</Text>
-                  <Text style={styles.rowMeta}>
-                    {`${entry.requests} requests · last ${when(entry.lastSeen)}`}
-                  </Text>
-                </View>
+                <Text style={styles.rowTitle}>{entry.ip ?? 'Unknown address'}</Text>
+                <Text style={styles.rowMeta}>{`${entry.requests} requests · last ${when(entry.lastSeen)}`}</Text>
               </View>
             ))
           )}
@@ -166,46 +154,40 @@ export function SecurityScreen({ onBack }: { onBack: () => void }) {
           </Pressable>
         </>
       )}
-    </ScrollView>
+    </GradientScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  back: { marginBottom: 12, alignSelf: 'flex-start' },
-  backText: { color: colors.brand, fontSize: 15, fontWeight: '700' },
-  loader: { marginTop: 40 },
-  error: { color: colors.danger, fontSize: 14, marginTop: 24, lineHeight: 20 },
-  warning: {
-    marginTop: 22,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-  },
-  warningTitle: { color: '#9a3412', fontWeight: '800', fontSize: 14 },
-  warningBody: { color: '#9a3412', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 26, marginBottom: 4 },
-  empty: { color: colors.muted, fontSize: 14, marginTop: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  rowMain: { flex: 1 },
-  rowTitle: { color: colors.inkStrong, fontSize: 15, fontWeight: '700' },
-  rowTitleBad: { color: colors.danger },
-  rowMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
-  retention: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 20 },
-  withdraw: {
-    marginTop: 24,
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.danger,
-  },
-  withdrawText: { color: colors.danger, fontWeight: '800', fontSize: 14 },
-});
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
+    back: { marginBottom: 12, alignSelf: 'flex-start' },
+    backText: { color: colors.brand, fontSize: 15, fontWeight: '700' },
+    loader: { marginTop: 40 },
+    error: { color: colors.danger, fontSize: 14, marginTop: 24, lineHeight: 20 },
+    warning: {
+      marginTop: 22,
+      padding: 16,
+      borderRadius: 18,
+      backgroundColor: colors.warnSoft,
+    },
+    warningTitle: { color: colors.warn, fontWeight: '800', fontSize: 14 },
+    warningBody: { color: colors.warn, fontSize: 13, lineHeight: 19, marginTop: 6 },
+    empty: { color: colors.muted, fontSize: 14, marginTop: 10 },
+    row: {
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.line,
+    },
+    rowTitle: { color: colors.inkStrong, fontSize: 15, fontWeight: '700' },
+    rowMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
+    retention: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 20 },
+    withdraw: {
+      marginTop: 24,
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: colors.danger,
+    },
+    withdrawText: { color: colors.danger, fontWeight: '800', fontSize: 14 },
+  });

@@ -15,6 +15,15 @@ export const pool = config.databaseUrl
     })
   : null;
 
+// node-postgres emits 'error' on the pool when an IDLE client fails — a
+// dropped connection, a database restart, a provider recycling the backend.
+// Node treats an unhandled 'error' event as fatal, so without this listener a
+// routine network blip would take the whole API process down. The pool discards
+// the bad client on its own; this only has to stop the crash.
+pool?.on('error', (error) => {
+  console.warn('[db] idle client error (connection discarded):', error.message);
+});
+
 export function hasDatabase() {
   return Boolean(pool);
 }

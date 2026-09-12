@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { saveConsent } from '../lib/api';
-import { colors, shared } from '../theme';
+import { useTheme } from '../state/theme';
+import type { Palette } from '../theme';
 import type { ConsentChoices } from '../types';
 
 /**
@@ -48,6 +49,8 @@ const ITEMS: Item[] = [
 ];
 
 export function ConsentScreen({ termsVersion, onDone }: { termsVersion: string; onDone: () => void }) {
+  const { colors, shared } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [choices, setChoices] = useState<ConsentChoices>({
     locationTracking: true,
     backgroundMonitoring: true,
@@ -134,7 +137,8 @@ export function ConsentScreen({ termsVersion, onDone }: { termsVersion: string; 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   content: { padding: 24, paddingBottom: 48, backgroundColor: colors.night, flexGrow: 1 },
   eyebrow: {
     color: colors.lilac,
@@ -162,4 +166,4 @@ const styles = StyleSheet.create({
   button: { marginTop: 22 },
   blocked: { color: '#fca5a5', fontSize: 13, lineHeight: 19, marginTop: 14, textAlign: 'center' },
   version: { color: '#6f6480', fontSize: 11, textAlign: 'center', marginTop: 20 },
-});
+  });

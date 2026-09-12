@@ -12,14 +12,73 @@ export const INTERVAL_PRESETS = [15, 30, 60, 120, 480, 1440, MAX_INTERVAL_MINUTE
 export const MAX_RECONCILED_MISSES = 10;
 
 export const BEHAVIOUR_PENALTY = 10;
+/** Floor and ceiling on how much a single good check-in can earn back. */
+export const BEHAVIOUR_RECOVERY_BASE = 4;
+export const BEHAVIOUR_RECOVERY_MAX = 10;
+/** Consecutive safe check-ins needed for each +1 of recovery. */
+export const STREAK_STEP = 3;
 
 export type RiskLevel = 'Low' | 'Medium' | 'High';
 
-/** Mirrors the web app's scoring so both clients report the same risk. */
-export function computeRisk(missedCount: number, fakeAlerts: number, behaviorScore: number) {
-  const riskScore = Math.min(
-    100,
-    Math.round(missedCount * 18 + fakeAlerts * 12 + (100 - behaviorScore) * 0.35)
+const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
+
+/**
+ * The part of the score model that reflects *current* conduct.
+ *
+ * `missedCount` is a lifetime total kept only for display. Risk is driven by
+ * `recentMisses`, which decays as the user checks in reliably — otherwise a
+ * single bad night would pin someone at High risk permanently, and there would
+ * be no way for good behaviour to earn anything back.
+ */
+export interface ConductState {
+  behaviorScore: number;
+  recentMisses: number;
+  safeStreak: number;
+  missedCount: number;
+}
+
+export const initialConduct = (): ConductState => ({
+  behaviorScore: 100,
+  recentMisses: 0,
+  safeStreak: 0,
+  missedCount: 0,
+});
+
+/** Longer streaks of good behaviour earn back more per check-in, up to a cap. */
+export function recoveryForStreak(safeStreak: number) {
+  return Math.min(BEHAVIOUR_RECOVERY_MAX, BEHAVIOUR_RECOVERY_BASE + Math.floor(safeStreak / STREAK_STEP));
+}
+
+/** Applies a confirmed "I'm safe" check-in. */
+export function applySafeCheckIn(state: ConductState): ConductState {
+  const safeStreak = state.safeStreak + 1;
+  return {
+    behaviorScore: clamp(state.behaviorScore + recoveryForStreak(safeStreak)),
+    // One good check-in forgives one recent miss.
+    recentMisses: Math.max(0, state.recentMisses - 1),
+    safeStreak,
+    missedCount: state.missedCount,
+  };
+}
+
+/** Applies one missed deadline. */
+export function applyMissedCheckIn(state: ConductState): ConductState {
+  return {
+    behaviorScore: clamp(state.behaviorScore - BEHAVIOUR_PENALTY),
+    recentMisses: state.recentMisses + 1,
+    safeStreak: 0,
+    missedCount: state.missedCount + 1,
+  };
+}
+
+/** A reported false alert costs the same as a miss but is tracked separately. */
+export function applyFalseAlert(state: ConductState): ConductState {
+  return { ...state, behaviorScore: clamp(state.behaviorScore - BEHAVIOUR_PENALTY) };
+}
+
+export function computeRisk(recentMisses: number, fakeAlerts: number, behaviorScore: number) {
+  const riskScore = clamp(
+    Math.round(recentMisses * 18 + fakeAlerts * 12 + (100 - behaviorScore) * 0.35)
   );
   const riskLevel: RiskLevel = riskScore >= 70 ? 'High' : riskScore >= 35 ? 'Medium' : 'Low';
   return { riskScore, riskLevel };
@@ -44,15 +103,13 @@ export function formatCountdown(totalSeconds: number) {
 export interface ReconcileInput {
   deadline: number;
   intervalMinutes: number;
-  missedCount: number;
-  behaviorScore: number;
+  conduct: ConductState;
   now: number;
 }
 
 export interface ReconcileResult {
   deadline: number;
-  missedCount: number;
-  behaviorScore: number;
+  conduct: ConductState;
   /** Deadlines that should be reported to the API as missed check-ins. */
   missedDeadlines: number[];
   /** Deadlines skipped past because the cap was hit. */
@@ -62,28 +119,17 @@ export interface ReconcileResult {
 /**
  * Rolls a deadline forward over every interval that elapsed while the app was
  * closed or suspended, recording a missed check-in for each.
- *
- * The previous implementation simply reset the deadline on launch, so missed
- * check-ins disappeared and the behaviour score never moved.
  */
-export function reconcileDeadlines({
-  deadline,
-  intervalMinutes,
-  missedCount,
-  behaviorScore,
-  now,
-}: ReconcileInput): ReconcileResult {
+export function reconcileDeadlines({ deadline, intervalMinutes, conduct, now }: ReconcileInput): ReconcileResult {
   const intervalMs = Math.max(1, intervalMinutes) * 60_000;
 
   let nextDeadline = deadline;
-  let missed = missedCount;
-  let behavior = behaviorScore;
+  let next = conduct;
   const missedDeadlines: number[] = [];
 
   while (nextDeadline <= now && missedDeadlines.length < MAX_RECONCILED_MISSES) {
     missedDeadlines.push(nextDeadline);
-    missed += 1;
-    behavior = Math.max(0, behavior - BEHAVIOUR_PENALTY);
+    next = applyMissedCheckIn(next);
     nextDeadline += intervalMs;
   }
 
@@ -97,5 +143,5 @@ export function reconcileDeadlines({
     nextDeadline += skipped * intervalMs;
   }
 
-  return { deadline: nextDeadline, missedCount: missed, behaviorScore: behavior, missedDeadlines, skipped };
+  return { deadline: nextDeadline, conduct: next, missedDeadlines, skipped };
 }

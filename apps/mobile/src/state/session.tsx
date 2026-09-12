@@ -2,11 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { StorageKeys, getJson, removeItem, setJson } from '../lib/storage';
 import {
+  ApiError,
   authenticate,
   getConsent,
   getProfile,
   loadTokens,
   logout as apiLogout,
+  saveTokens,
   setAuthLostHandler,
   updateProfile as apiUpdateProfile,
 } from '../lib/api';
@@ -131,9 +133,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(storedUser);
         setTrustedContacts([]);
 
-        // Revalidate against the server; refresh happens transparently.
-        const fresh = await getProfile().catch(() => null);
-        if (!cancelled && fresh?.user) {
+        // Revalidate against the server; token refresh happens transparently.
+        const fresh = await getProfile().catch((error: unknown) => {
+          const status = error instanceof ApiError ? error.status : 0;
+          // 401/404 means the account is genuinely gone, not that the network
+          // blipped. Keeping the cached user there would leave the app looking
+          // signed in while every request failed.
+          return status === 401 || status === 404 ? 'gone' : null;
+        });
+
+        if (cancelled) return;
+
+        if (fresh === 'gone') {
+          await saveTokens(null);
+          await clearLocalSession();
+          return;
+        }
+
+        if (fresh?.user) {
           setUser(fresh.user);
           await setJson(StorageKeys.session, fresh.user);
         }

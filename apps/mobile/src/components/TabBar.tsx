@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
-import { tabBarStyles as styles } from '../theme';
+import { Pressable, Text } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../state/theme';
 import type { Tab } from '../types';
 
 const TABS: Array<{ id: Tab; icon: string; label: string }> = [
@@ -12,8 +13,15 @@ const TABS: Array<{ id: Tab; icon: string; label: string }> = [
 ];
 
 export function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
+  const { tabBarStyles: styles, gradient } = useTheme();
+
   return (
-    <View style={styles.bar}>
+    <LinearGradient
+      colors={gradient.tabBar}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.bar}
+    >
       {TABS.map((tab) => {
         const isActive = tab.id === active;
         return (
@@ -32,6 +40,6 @@ export function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab)
           </Pressable>
         );
       })}
-    </View>
+    </LinearGradient>
   );
 }
