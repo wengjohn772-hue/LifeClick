@@ -5,6 +5,9 @@ import type {
   CheckInRecord,
   ConsentChoices,
   ConsentStatus,
+  FafConnection,
+  FafFix,
+  FafRequest,
   FeedPost,
   FeedRegion,
   FeedTag,
@@ -313,3 +316,29 @@ export const getSecurityActivity = () =>
   apiRequest<SecurityActivity & { ok: true }>('/api/security/activity');
 
 export const getIncidents = () => apiRequest<{ incidents: Incident[] }>('/api/security/incidents');
+
+/* ------------------------------------------------------- find a friend */
+
+export const requestFafPairing = (fafId: string) =>
+  apiRequest<{ request: FafRequest; notified: boolean }>('/api/faf/requests', {
+    method: 'POST',
+    body: { fafId },
+  });
+
+export const getFafRequests = () =>
+  apiRequest<{ incoming: FafRequest[]; outgoing: FafRequest[] }>('/api/faf/requests');
+
+export const respondToFafRequest = (id: string, accept: boolean) =>
+  apiRequest<{ status: string; connectionId: string }>(`/api/faf/requests/${id}/respond`, {
+    method: 'POST',
+    body: { accept },
+  });
+
+export const cancelFafRequest = (id: string) =>
+  apiRequest<{ cancelled: boolean }>(`/api/faf/requests/${id}`, { method: 'DELETE' });
+
+export const getFafConnections = () =>
+  apiRequest<{ connections: FafConnection[]; me: FafFix | null }>('/api/faf/connections');
+
+export const disconnectFaf = (id: string) =>
+  apiRequest<{ disconnected: boolean }>(`/api/faf/connections/${id}/disconnect`, { method: 'POST' });

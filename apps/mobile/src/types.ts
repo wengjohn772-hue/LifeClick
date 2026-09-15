@@ -109,6 +109,37 @@ export interface SecurityActivity {
   retention: { accessLogDays: number; securityLogDays: number; locationDays: number };
 }
 
+export interface FafPerson {
+  name: string;
+  fafId: string;
+  avatarId: string;
+}
+
+export interface FafFix {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  capturedAt: string;
+}
+
+export interface FafRequest {
+  id: string;
+  status: string;
+  requestedAt: string;
+  direction: 'incoming' | 'outgoing';
+  person: FafPerson;
+}
+
+export interface FafConnection {
+  id: string;
+  status: string;
+  startedAt: string | null;
+  person: FafPerson;
+  /** Null until the other person's device has reported a position. */
+  location: FafFix | null;
+  startedByMe: boolean;
+}
+
 export interface Incident {
   id: number;
   status: string;

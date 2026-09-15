@@ -14,7 +14,7 @@ import { FafScreen } from './FafScreen';
 import { FeedsScreen } from './FeedsScreen';
 import { SafetyScreen } from './SafetyScreen';
 import { SettingsScreen } from './SettingsScreen';
-import { isBackgroundTrackingActive, startBackgroundTracking } from '../lib/locationTask';
+import { isBackgroundTrackingActive, isExpoGo, startBackgroundTracking } from '../lib/locationTask';
 import { saveLocation } from '../lib/api';
 import { useSafety } from '../state/safety';
 import { useTheme } from '../state/theme';
@@ -44,37 +44,47 @@ export function MobileShell() {
     let subscription: Location.LocationSubscription | undefined;
     let cancelled = false;
 
+    // Nothing awaits this, so anything it throws — location services disabled,
+    // a permission dialog dismissed by the OS — would become an unhandled
+    // rejection and an error overlay rather than a message on the screen.
     (async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (cancelled) return;
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (cancelled) return;
 
-      if (!permission.granted) {
-        setLocationMessage('Allow location in device settings to show your position.');
-        return;
-      }
-
-      setLocationMessage('Live location monitoring is active.');
-
-      subscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 15_000, distanceInterval: 10 },
-        (next) => {
-          // The map updates on every fix; only the write is throttled.
-          setLocation(next);
-
-          if (Date.now() - lastPersistedAt.current < FOREGROUND_PERSIST_INTERVAL_MS) return;
-          lastPersistedAt.current = Date.now();
-
-          void saveLocation({
-            latitude: next.coords.latitude,
-            longitude: next.coords.longitude,
-            accuracy: next.coords.accuracy ?? 0,
-            status: 'live',
-          }).catch(() => undefined);
+        if (!permission.granted) {
+          setLocationMessage('Allow location in device settings to show your position.');
+          return;
         }
-      );
 
-      if (cancelled) return;
-      setBackgroundActive(await isBackgroundTrackingActive());
+        setLocationMessage('Live location monitoring is active.');
+
+        subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 15_000, distanceInterval: 10 },
+          (next) => {
+            // The map updates on every fix; only the write is throttled.
+            setLocation(next);
+
+            if (Date.now() - lastPersistedAt.current < FOREGROUND_PERSIST_INTERVAL_MS) return;
+            lastPersistedAt.current = Date.now();
+
+            void saveLocation({
+              latitude: next.coords.latitude,
+              longitude: next.coords.longitude,
+              accuracy: next.coords.accuracy ?? 0,
+              status: 'live',
+            }).catch(() => undefined);
+          }
+        );
+
+        if (cancelled) return;
+        setBackgroundActive(await isBackgroundTrackingActive());
+      } catch (error) {
+        if (cancelled) return;
+        setLocationMessage(
+          error instanceof Error ? error.message : 'Location is unavailable on this device right now.'
+        );
+      }
     })();
 
     return () => {
@@ -89,8 +99,12 @@ export function MobileShell() {
   // Auto-start background monitoring only once the user's real settings have
   // loaded, so a user who disabled tracking is not opted back in by the
   // defaults that apply during the first render.
+  //
+  // Skipped in Expo Go, where it can only ever fail: attempting it on launch
+  // replaced the live-location status with an error before the user had done
+  // anything. The Settings button still explains why when they ask for it.
   useEffect(() => {
-    if (!ready || !settings.trackingEnabled || backgroundActive) return;
+    if (!ready || !settings.trackingEnabled || backgroundActive || isExpoGo) return;
     void enableBackground();
   }, [ready, settings.trackingEnabled, backgroundActive, enableBackground]);
 
