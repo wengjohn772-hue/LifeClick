@@ -33,6 +33,9 @@ interface SessionValue {
     phone: string;
     address: string;
     trustedContacts: TrustedContact[];
+    accountType?: 'individual' | 'business';
+    businessName?: string;
+    businessType?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (changes: Partial<AuthUser>) => Promise<void>;
@@ -185,6 +188,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       phone: string;
       address: string;
       trustedContacts: TrustedContact[];
+      accountType?: 'individual' | 'business';
+      businessName?: string;
+      businessType?: string;
     }) => {
       const result = await authenticate({ mode: 'register', ...payload });
       await afterAuthenticated(result.user, result.trustedContacts ?? payload.trustedContacts, Boolean(result.demo));

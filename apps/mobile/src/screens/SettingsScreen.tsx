@@ -29,7 +29,7 @@ export function SettingsScreen({
   locationMessage: string;
   onEnableBackground: () => void;
 }) {
-  const { colors, shared, preference, setPreference } = useTheme();
+  const { colors, shared, preference, setPreference, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, signOut, demoMode } = useSession();
   const { settings, changeInterval, changeSettings } = useSafety();
@@ -166,10 +166,8 @@ export function SettingsScreen({
       </View>
 
       {/* Check-in timing */}
-      <Text style={shared.sectionTitle}>Set click time</Text>
-      <Text style={shared.sectionHint}>
-        How often you should tap &ldquo;I&apos;m safe&rdquo;. Miss it and your trusted contacts are alerted.
-      </Text>
+      <Text style={shared.sectionTitle}>{copy.checkIn.intervalTitle}</Text>
+      <Text style={shared.sectionHint}>{copy.checkIn.intervalHint}</Text>
 
       <View style={styles.presetRow}>
         {INTERVAL_PRESETS.map((minutes) => {
@@ -220,11 +218,11 @@ export function SettingsScreen({
       </View>
 
       {/* Trusted contacts */}
-      <Text style={shared.sectionTitle}>Trusted contacts</Text>
-      <Text style={shared.sectionHint}>Up to five people who are alerted if you go quiet.</Text>
+      <Text style={shared.sectionTitle}>{copy.contacts.title}</Text>
+      <Text style={shared.sectionHint}>{copy.contacts.hint}</Text>
 
       {contacts.length === 0 ? (
-        <Text style={styles.emptyContacts}>No trusted contacts yet.</Text>
+        <Text style={styles.emptyContacts}>{copy.contacts.empty}</Text>
       ) : (
         contacts.map((contact) => (
           <Pressable key={contact.id ?? contact.phone} onLongPress={() => onDeleteContact(contact)}>
@@ -246,10 +244,10 @@ export function SettingsScreen({
             compact
           />
           <Field
-            label="Relationship"
+            label={copy.contacts.relationLabel}
             value={contactRelation}
             onChangeText={setContactRelation}
-            placeholder="Friend, family, colleague"
+            placeholder={copy.contacts.relationPlaceholder}
             compact
           />
           <Pressable
@@ -257,7 +255,7 @@ export function SettingsScreen({
             disabled={savingContact}
             style={({ pressed }) => [shared.primaryButton, pressed && shared.pressed, savingContact && shared.disabled]}
           >
-            <Text style={shared.primaryText}>{savingContact ? 'Saving…' : 'Add trusted contact'}</Text>
+            <Text style={shared.primaryText}>{savingContact ? 'Saving…' : copy.contacts.addButton}</Text>
           </Pressable>
           {contactError ? <Text style={[shared.message, shared.errorMessage]}>{contactError}</Text> : null}
         </View>

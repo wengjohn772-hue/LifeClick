@@ -36,7 +36,7 @@ function ago(iso: string) {
 }
 
 export function FafScreen() {
-  const { colors, shared } = useTheme();
+  const { colors, shared, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useSession();
 
@@ -181,17 +181,15 @@ export function FafScreen() {
 
   return (
     <GradientScreen refreshing={false} onRefresh={() => void refresh()}>
-      <Text style={shared.screenEyebrow}>Safety circle</Text>
-      <Text style={shared.screenTitle}>Find a Friend</Text>
-      <Text style={shared.screenSubtitle}>
-        Connect by FaF ID to share live location. Both sides must agree, and either can stop it.
-      </Text>
+      <Text style={shared.screenEyebrow}>{copy.faf.eyebrow}</Text>
+      <Text style={shared.screenTitle}>{copy.faf.title}</Text>
+      <Text style={shared.screenSubtitle}>{copy.faf.subtitle}</Text>
 
       {user?.fafId ? (
         <View style={styles.idCard}>
-          <Text style={shared.cardLabel}>YOUR FAF ID</Text>
+          <Text style={shared.cardLabel}>{copy.faf.idLabel}</Text>
           <Text style={styles.idValue}>{user.fafId}</Text>
-          <Text style={shared.cardHint}>Share this with people you trust so they can request to connect.</Text>
+          <Text style={shared.cardHint}>{copy.faf.idHint}</Text>
         </View>
       ) : null}
 
@@ -272,7 +270,7 @@ export function FafScreen() {
       ) : null}
 
       {/* Search */}
-      <Text style={shared.sectionTitle}>Connect to someone</Text>
+      <Text style={shared.sectionTitle}>{copy.faf.connectTitle}</Text>
       <View style={shared.formCard}>
         <Field
           label="FaF ID"

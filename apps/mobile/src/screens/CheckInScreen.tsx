@@ -7,7 +7,7 @@ import { useTheme } from '../state/theme';
 import type { Palette } from '../theme';
 
 export function CheckInScreen() {
-  const { colors, shared, gradient, isDark } = useTheme();
+  const { colors, shared, gradient, isDark, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     remainingSeconds,
@@ -48,9 +48,9 @@ export function CheckInScreen() {
 
   return (
     <GradientScreen>
-      <Text style={shared.screenEyebrow}>LifeClick safety</Text>
-      <Text style={shared.screenTitle}>Check in</Text>
-      <Text style={shared.screenSubtitle}>One tap tells your circle you are okay.</Text>
+      <Text style={shared.screenEyebrow}>{copy.checkIn.eyebrow}</Text>
+      <Text style={shared.screenTitle}>{copy.checkIn.title}</Text>
+      <Text style={shared.screenSubtitle}>{copy.checkIn.subtitle}</Text>
 
       {/* Timer on/off */}
       <View style={styles.toggleCard}>
@@ -62,12 +62,10 @@ export function CheckInScreen() {
                 { backgroundColor: monitoringEnabled ? colors.safe : colors.warn },
               ]}
             />
-            <Text style={styles.toggleTitle}>{monitoringEnabled ? 'Timer running' : 'Timer paused'}</Text>
+            <Text style={styles.toggleTitle}>{monitoringEnabled ? copy.checkIn.timerOn : copy.checkIn.timerOff}</Text>
           </View>
           <Text style={styles.toggleHint}>
-            {monitoringEnabled
-              ? 'Miss a check-in and your trusted contacts are alerted.'
-              : 'Nobody will be alerted while this is off.'}
+            {monitoringEnabled ? copy.checkIn.timerOnHint : copy.checkIn.timerOffHint}
           </Text>
         </View>
         <Switch
@@ -82,12 +80,12 @@ export function CheckInScreen() {
 
       {/* Countdown */}
       <LinearGradient
-        colors={isDark ? ['#241640', '#1a1030'] : ['#ffffff', '#f6f0ff']}
+        colors={gradient.card}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.timerCard}
       >
-        <Text style={shared.cardLabel}>{monitoringEnabled ? 'NEXT CHECK-IN' : 'TIMER PAUSED'}</Text>
+        <Text style={shared.cardLabel}>{monitoringEnabled ? copy.checkIn.nextLabel : copy.checkIn.timerOff.toUpperCase()}</Text>
         <Text style={[styles.timer, urgent && { color: colors.danger }]}>
           {!ready ? '--:--' : monitoringEnabled ? formatCountdown(remainingSeconds) : '—'}
         </Text>
@@ -107,7 +105,7 @@ export function CheckInScreen() {
         style={({ pressed }) => [styles.checkWrap, pressed && styles.checkPressed, (busy || !ready) && shared.disabled]}
       >
         <LinearGradient colors={gradient.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.checkButton}>
-          <Text style={styles.checkButtonText}>{busy ? '…' : "I'm safe"}</Text>
+          <Text style={styles.checkButtonText}>{busy ? '…' : copy.checkIn.button}</Text>
           <Text style={styles.checkButtonHint}>
             {monitoringEnabled ? 'Tap to reset timer' : 'Tap to resume timer'}
           </Text>

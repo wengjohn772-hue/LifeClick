@@ -33,7 +33,7 @@ function buildSlices(regions: FeedRegion[]): Slice[] {
 }
 
 export function FeedsScreen() {
-  const { colors, shared } = useTheme();
+  const { colors, shared, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -103,9 +103,9 @@ export function FeedsScreen() {
   return (
     <View style={styles.root}>
       <GradientScreen refreshing={refreshing} onRefresh={onRefresh} contentStyle={styles.content}>
-        <Text style={shared.screenEyebrow}>Community safety</Text>
-        <Text style={shared.screenTitle}>Feeds</Text>
-        <Text style={shared.screenSubtitle}>Anonymous updates from around you.</Text>
+        <Text style={shared.screenEyebrow}>{copy.feeds.eyebrow}</Text>
+        <Text style={shared.screenTitle}>{copy.feeds.title}</Text>
+        <Text style={shared.screenSubtitle}>{copy.feeds.subtitle}</Text>
 
         {/* Verification / guidelines notice */}
         <View style={styles.notice}>
@@ -113,12 +113,9 @@ export function FeedsScreen() {
             <View style={styles.verifiedBadge}>
               <Text style={styles.verifiedIcon}>✓</Text>
             </View>
-            <Text style={styles.noticeTitle}>Verified community feed</Text>
+            <Text style={styles.noticeTitle}>{copy.feeds.noticeTitle}</Text>
           </View>
-          <Text style={styles.noticeBody}>
-            Reports here are reviewed and must follow the community guidelines. Share only what you have seen
-            yourself — posting fake news or misleading reports will result in a penalty.
-          </Text>
+          <Text style={styles.noticeBody}>{copy.feeds.noticeBody}</Text>
         </View>
 
         {/* Location slicer */}
@@ -164,7 +161,7 @@ export function FeedsScreen() {
           </View>
         ) : posts.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>Nothing reported here yet</Text>
+            <Text style={styles.emptyTitle}>{copy.feeds.emptyTitle}</Text>
             <Text style={styles.emptyBody}>
               {slice.key === 'all'
                 ? 'Be the first to share a safety update.'

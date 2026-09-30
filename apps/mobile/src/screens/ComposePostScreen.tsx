@@ -29,7 +29,7 @@ const TAG_HINT: Record<FeedTag, string> = {
 };
 
 export function ComposePostScreen({ onClose, onPosted }: { onClose: () => void; onPosted: (post: FeedPost) => void }) {
-  const { colors, shared } = useTheme();
+  const { colors, shared, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tagTone = useMemo(() => TAG_TONE(colors), [colors]);
 
@@ -147,9 +147,9 @@ export function ComposePostScreen({ onClose, onPosted }: { onClose: () => void; 
           </Pressable>
         </View>
 
-        <Text style={shared.screenEyebrow}>Community safety</Text>
-        <Text style={shared.screenTitle}>New report</Text>
-        <Text style={shared.screenSubtitle}>Posted anonymously — your name is never shown.</Text>
+        <Text style={shared.screenEyebrow}>{copy.feeds.eyebrow}</Text>
+        <Text style={shared.screenTitle}>{copy.feeds.composeTitle}</Text>
+        <Text style={shared.screenSubtitle}>{copy.feeds.composeSubtitle}</Text>
 
         {/* Guidelines */}
         <View style={styles.guidelines}>

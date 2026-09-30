@@ -49,7 +49,7 @@ function Meter({ value, tone, track }: { value: number; tone: string; track: str
 }
 
 export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }) {
-  const { colors, shared, isDark } = useTheme();
+  const { colors, shared, gradient, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     remainingSeconds,
@@ -72,13 +72,13 @@ export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }
 
   return (
     <GradientScreen>
-      <Text style={shared.screenEyebrow}>AI safety monitor</Text>
-      <Text style={shared.screenTitle}>Safety dashboard</Text>
-      <Text style={shared.screenSubtitle}>A quiet watch over your check-in behaviour.</Text>
+      <Text style={shared.screenEyebrow}>{copy.safety.eyebrow}</Text>
+      <Text style={shared.screenTitle}>{copy.safety.title}</Text>
+      <Text style={shared.screenSubtitle}>{copy.safety.subtitle}</Text>
 
       {/* Headline risk card */}
       <LinearGradient
-        colors={isDark ? ['#241640', '#1a1030'] : ['#ffffff', '#f6f0ff']}
+        colors={gradient.card}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.riskCard}
@@ -188,10 +188,7 @@ export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }
         <Text style={styles.falseAlertText}>Report false alert</Text>
       </Pressable>
 
-      <Text style={styles.disclaimer}>
-        Missed check-ins are detected by LifeClick&apos;s servers, but trusted-contact escalation has not been
-        tested on real devices yet. Do not rely on this as an emergency service.
-      </Text>
+      <Text style={styles.disclaimer}>{copy.safety.disclaimer}</Text>
     </GradientScreen>
   );
 }

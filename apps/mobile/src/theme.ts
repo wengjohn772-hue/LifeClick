@@ -2,9 +2,14 @@ import { Platform, StyleSheet } from 'react-native';
 
 export type ThemeMode = 'light' | 'dark';
 
+/** The two products. Individual is violet, Business is amber. */
+export type Brand = 'individual' | 'business';
+
 /**
- * Both palettes expose the same keys, so screens can style against semantic
- * roles (surface, body, line) and never branch on the active mode.
+ * Both palettes expose the same keys, so screens style against semantic roles
+ * (surface, body, line) and never branch on the mode or the brand. That is what
+ * made adding a second brand a data change rather than a rewrite — and it is
+ * what will let the Business app keep only its own palette when it splits off.
  */
 export interface Palette {
   brand: string;
@@ -40,7 +45,7 @@ export interface Palette {
   shadow: string;
 }
 
-export const lightColors: Palette = {
+const individualLight: Palette = {
   brand: '#6d28d9',
   brandDark: '#5b21b6',
   brandTint: '#f0e8ff',
@@ -74,7 +79,7 @@ export const lightColors: Palette = {
   shadow: '#6d28d9',
 };
 
-export const darkColors: Palette = {
+const individualDark: Palette = {
   brand: '#a78bfa',
   brandDark: '#c4b5fd',
   brandTint: '#2a1b3d',
@@ -108,19 +113,126 @@ export const darkColors: Palette = {
   shadow: '#000000',
 };
 
-export const palettes: Record<ThemeMode, Palette> = { light: lightColors, dark: darkColors };
+// Amber rather than a pure yellow: pure yellow cannot carry white text at an
+// accessible contrast ratio, so buttons and active states use amber-700, with
+// the lighter golds reserved for fills and accents.
+const businessLight: Palette = {
+  brand: '#b45309',
+  brandDark: '#92400e',
+  brandTint: '#fef3c7',
+  brandSoft: '#fffbeb',
+  onBrand: '#ffffff',
+  ink: '#2b1d05',
+  inkStrong: '#451a03',
+  body: '#78603a',
+  muted: '#9a8258',
+  faint: '#c0a97e',
+  line: '#f3e4c4',
+  lineSoft: '#f7ecd4',
+  surface: '#ffffff',
+  surfaceRaised: '#ffffff',
+  canvas: '#fffdf5',
+  night: '#120c02',
+  nightCard: '#241a07',
+  nightLine: '#453516',
+  lilac: '#fcd34d',
+  danger: '#be123c',
+  dangerSoft: '#fee2e2',
+  onDangerSoft: '#9f1239',
+  safe: '#047857',
+  safeSoft: '#d1fae5',
+  // Amber is the brand here, so the "warning" role moves to orange to stay
+  // distinguishable from ordinary brand chrome.
+  warn: '#c2410c',
+  warnSoft: '#ffedd5',
+  inputBg: '#fffdf5',
+  inputBorder: '#eddfc2',
+  switchTrackOff: '#e0d2b4',
+  overlay: 'rgba(28, 20, 5, 0.80)',
+  shadow: '#b45309',
+};
 
-/** Screen backdrop gradients, per theme. Tuples satisfy LinearGradient's typing. */
-export const gradients: Record<ThemeMode, { screen: readonly [string, string, string]; tabBar: readonly [string, string]; hero: readonly [string, string] }> = {
-  light: {
-    screen: ['#f7f4fb', '#efe9fa', '#e6dcf7'] as const,
-    tabBar: ['#ffffff', '#f3ecfd'] as const,
-    hero: ['#6d28d9', '#8b5cf6'] as const,
+const businessDark: Palette = {
+  brand: '#fbbf24',
+  brandDark: '#fcd34d',
+  brandTint: '#3d2c08',
+  brandSoft: '#2a1e05',
+  onBrand: '#1f1503',
+  ink: '#faf3e4',
+  inkStrong: '#ffffff',
+  body: '#cdb98f',
+  muted: '#9d8a63',
+  faint: '#7a6a49',
+  line: '#3a2c11',
+  lineSoft: '#453516',
+  surface: '#1c1405',
+  surfaceRaised: '#241a07',
+  canvas: '#120c02',
+  night: '#0f0a02',
+  nightCard: '#241a07',
+  nightLine: '#453516',
+  lilac: '#fcd34d',
+  danger: '#fb7185',
+  dangerSoft: '#3d1220',
+  onDangerSoft: '#fda4af',
+  safe: '#34d399',
+  safeSoft: '#0f2f26',
+  warn: '#fb923c',
+  warnSoft: '#3a1e0a',
+  inputBg: '#241a07',
+  inputBorder: '#4a3817',
+  switchTrackOff: '#4a3d21',
+  overlay: 'rgba(10, 7, 1, 0.84)',
+  shadow: '#000000',
+};
+
+export const palettes: Record<Brand, Record<ThemeMode, Palette>> = {
+  individual: { light: individualLight, dark: individualDark },
+  business: { light: businessLight, dark: businessDark },
+};
+
+export interface GradientSet {
+  screen: readonly [string, string, string];
+  tabBar: readonly [string, string];
+  hero: readonly [string, string];
+  /** Raised cards (countdown, headline risk) that sit above the screen wash. */
+  card: readonly [string, string];
+  /** The pre-auth backdrop, which keeps its dramatic dark look in both modes. */
+  auth: readonly [string, string, string];
+}
+
+export const gradients: Record<Brand, Record<ThemeMode, GradientSet>> = {
+  individual: {
+    light: {
+      screen: ['#f7f4fb', '#efe9fa', '#e6dcf7'] as const,
+      tabBar: ['#ffffff', '#f3ecfd'] as const,
+      hero: ['#6d28d9', '#8b5cf6'] as const,
+      card: ['#ffffff', '#f6f0ff'] as const,
+      auth: ['#08050d', '#1a0b2e', '#2d1150'] as const,
+    },
+    dark: {
+      screen: ['#0d0816', '#140d24', '#1b1030'] as const,
+      tabBar: ['#150e24', '#0d0816'] as const,
+      hero: ['#4c1d95', '#6d28d9'] as const,
+      card: ['#241640', '#1a1030'] as const,
+      auth: ['#08050d', '#1a0b2e', '#2d1150'] as const,
+    },
   },
-  dark: {
-    screen: ['#0d0816', '#140d24', '#1b1030'] as const,
-    tabBar: ['#150e24', '#0d0816'] as const,
-    hero: ['#4c1d95', '#6d28d9'] as const,
+  business: {
+    light: {
+      screen: ['#fffdf5', '#fef8e7', '#fdf0cf'] as const,
+      tabBar: ['#ffffff', '#fdf6e3'] as const,
+      hero: ['#b45309', '#f59e0b'] as const,
+      card: ['#ffffff', '#fff6e2'] as const,
+      auth: ['#140d02', '#2e1c03', '#54350a'] as const,
+    },
+    dark: {
+      screen: ['#120c02', '#1b1204', '#241806'] as const,
+      tabBar: ['#1a1204', '#120c02'] as const,
+      hero: ['#92400e', '#d97706'] as const,
+      card: ['#2b1f07', '#1d1404'] as const,
+      auth: ['#140d02', '#2e1c03', '#54350a'] as const,
+    },
   },
 };
 
@@ -130,10 +242,7 @@ export const riskColor = (score: number, colors: Palette) =>
 export const riskSoftColor = (score: number, colors: Palette) =>
   score >= 70 ? colors.dangerSoft : score >= 35 ? colors.warnSoft : colors.safeSoft;
 
-/**
- * Styles shared across more than one screen, rebuilt whenever the palette
- * changes. Screens get this from useTheme() rather than importing it directly.
- */
+/** Styles shared across more than one screen, rebuilt whenever the palette changes. */
 export const createShared = (colors: Palette) =>
   StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.night },

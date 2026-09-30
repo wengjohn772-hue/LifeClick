@@ -25,15 +25,25 @@ export const trustedContactSchema = z.object({
   relation: z.string().trim().max(100).optional().default('Trusted contact'),
 });
 
+export const ACCOUNT_TYPES = ['individual', 'business'];
+
 export const registerSchema = z.object({
   name: trimmed(255),
+  accountType: z.enum(['individual', 'business']).optional().default('individual'),
+  businessName: z.string().trim().max(160).optional(),
+  businessType: z.string().trim().max(80).optional(),
   email: z.string().trim().toLowerCase().email().max(255),
   // 8 characters matches the "At least 8 characters" hint both clients show.
   password: z.string().min(8).max(200),
   phone: trimmed(50),
   address: trimmed(500),
   trustedContacts: z.array(trustedContactSchema).max(5).optional().default([]),
-});
+}).refine(
+  // A business account without a business name would show an empty header and
+  // could not be told apart from an individual in any export.
+  (value) => value.accountType !== 'business' || Boolean(value.businessName),
+  { path: ['businessName'], message: 'A business name is required for a business account.' }
+);
 
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),
@@ -54,6 +64,8 @@ export const locationSchema = z.object({
 
 export const profileSchema = z.object({
   name: z.string().trim().min(1).max(255).optional(),
+  businessName: z.string().trim().max(160).optional(),
+  businessType: z.string().trim().max(80).optional(),
   phone: z.string().trim().max(50).optional(),
   address: z.string().trim().max(500).optional(),
   avatarId: z.string().trim().max(32).optional(),

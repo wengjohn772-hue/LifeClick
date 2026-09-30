@@ -19,6 +19,18 @@ const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 feedsRouter.use(express.json({ limit: '8mb' }));
 feedsRouter.use(requireAuth, requireDatabase);
 
+/**
+ * Feeds are separated by product: a business should not be reading consumer
+ * street reports, nor consumers trade notices. Resolving it from the account
+ * (rather than a client-supplied parameter) also means the eventual
+ * Business-only database can take its posts with a single WHERE clause.
+ */
+async function audienceFor(req) {
+  if (req.demoMode) return 'individual';
+  const { rows } = await query('SELECT account_type FROM users WHERE id = $1', [req.user.id]);
+  return rows[0]?.account_type === 'business' ? 'business' : 'individual';
+}
+
 const DEMO_POSTS = [
   { id: 'demo-1', userId: 'user-7F42', area: 'Riverside Dr.', country: 'Nigeria', state: 'Lagos', tag: 'Notice', body: 'Streetlights are out along the whole stretch past the bridge.', likes: 12, reposts: 3, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/lifeclick-riverside/800/500', mine: false, createdAt: new Date().toISOString() },
   { id: 'demo-2', userId: 'user-3K91', area: 'Market Square', country: 'Nigeria', state: 'Lagos', tag: 'Alert', body: 'Keep devices out of sight while waiting near the taxi rank.', likes: 41, reposts: 18, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/lifeclick-market/800/500', mine: false, createdAt: new Date().toISOString() },
@@ -74,11 +86,12 @@ feedsRouter.get(
     const { rows } = await query(
       `${POST_SELECT}
        WHERE p.status = 'published'
+         AND p.audience = $5
          AND ($2::text IS NULL OR p.country = $2)
          AND ($3::text IS NULL OR p.state = $3)
        ORDER BY p.created_at DESC
        LIMIT $4`,
-      [req.user.id, country, state, limit]
+      [req.user.id, country, state, limit, await audienceFor(req)]
     );
 
     return res.json({ ok: true, posts: rows.map((row) => serializePost(row, req.user.id)) });
@@ -94,9 +107,10 @@ feedsRouter.get(
     const { rows } = await query(
       `SELECT country, state, COUNT(*)::int AS posts
        FROM feed_posts
-       WHERE status = 'published' AND country IS NOT NULL
+       WHERE status = 'published' AND country IS NOT NULL AND audience = $1
        GROUP BY country, state
-       ORDER BY country ASC, posts DESC`
+       ORDER BY country ASC, posts DESC`,
+      [await audienceFor(req)]
     );
 
     // Grouped by country so the UI can show a country row and its states.
@@ -193,6 +207,8 @@ feedsRouter.post(
       }
     }
 
+    const audience = await audienceFor(req);
+
     const post = await withTransaction(async (client) => {
       let imageId = null;
       if (buffer) {
@@ -205,11 +221,11 @@ feedsRouter.post(
       }
 
       const { rows } = await client.query(
-        `INSERT INTO feed_posts (author_user_id, anon_handle, area, country, state, body, tag, image_id, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        `INSERT INTO feed_posts (author_user_id, anon_handle, area, country, state, body, tag, image_id, audience, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING id, anon_handle, area, country, state, body, tag, image_id, image_url, author_user_id, created_at,
                    0 AS likes, 0 AS reposts, FALSE AS liked_by_me, FALSE AS reposted_by_me`,
-        [req.user.id, anonHandle(), area ?? null, country ?? null, state ?? null, body, tag, imageId]
+        [req.user.id, anonHandle(), area ?? null, country ?? null, state ?? null, body, tag, imageId, audience]
       );
       return rows[0];
     });

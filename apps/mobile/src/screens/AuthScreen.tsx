@@ -13,11 +13,11 @@ import type { TrustedContact } from '../types';
 type AuthMode = 'login' | 'register';
 
 // The sign-in screen keeps its dramatic dark backdrop in both themes; only the
-// form card follows the palette, so inputs stay readable either way.
-const BACKDROP = ['#08050d', '#1a0b2e', '#2d1150'] as const;
-
-export function AuthScreen() {
-  const { colors, shared } = useTheme();
+// form card follows the palette, so inputs stay readable either way. The
+// backdrop itself is brand-tinted, so Business arrives on amber rather than
+// violet before the account even exists.
+export function AuthScreen({ onBack }: { onBack?: () => void }) {
+  const { colors, shared, gradient, isBusiness, copy } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { signIn, signUp } = useSession();
 
@@ -27,6 +27,8 @@ export function AuthScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [businessType, setBusinessType] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactRelation, setContactRelation] = useState('');
@@ -50,6 +52,10 @@ export function AuthScreen() {
     if (mode === 'register') {
       if (!name.trim() || !phone.trim() || !address.trim()) {
         fail('Complete your name, phone number, and address.');
+        return;
+      }
+      if (isBusiness && !businessName.trim()) {
+        fail('Enter your business name.');
         return;
       }
       // Matches the server's minimum, so the failure is caught before a round trip.
@@ -82,6 +88,8 @@ export function AuthScreen() {
           phone: phone.trim(),
           address: address.trim(),
           trustedContacts,
+          accountType: isBusiness ? 'business' : 'individual',
+          ...(isBusiness ? { businessName: businessName.trim(), businessType: businessType.trim() } : {}),
         });
       }
     } catch (error) {
@@ -93,15 +101,21 @@ export function AuthScreen() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={BACKDROP} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={gradient.auth} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <StatusBar style="light" />
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.brandRow}>
               <View style={styles.pulseDot} />
-              <Text style={styles.brand}>LifeClick</Text>
+              <Text style={styles.brand}>{copy.productName}</Text>
             </View>
+
+            {onBack ? (
+              <Pressable onPress={onBack} hitSlop={10} style={styles.back}>
+                <Text style={styles.backText}>‹ Change account type</Text>
+              </Pressable>
+            ) : null}
 
             <Text style={styles.eyebrow}>
               {mode === 'login' ? 'Personal safety, made simple' : 'Build your safety circle'}
@@ -132,7 +146,28 @@ export function AuthScreen() {
             <View style={shared.formCard}>
               {mode === 'register' && (
                 <>
-                  <Field label="Full name" value={name} onChangeText={setName} placeholder="Your full name" />
+                  {isBusiness ? (
+                    <>
+                      <Field
+                        label="Business name"
+                        value={businessName}
+                        onChangeText={setBusinessName}
+                        placeholder="Your registered business name"
+                      />
+                      <Field
+                        label="Industry (optional)"
+                        value={businessType}
+                        onChangeText={setBusinessType}
+                        placeholder="Security, logistics, construction…"
+                      />
+                    </>
+                  ) : null}
+                  <Field
+                    label={isBusiness ? 'Your name' : 'Full name'}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Your full name"
+                  />
                   <Field
                     label="Phone number"
                     value={phone}
@@ -219,12 +254,14 @@ const createStyles = (colors: Palette) =>
       height: 18,
       borderRadius: 9,
       borderWidth: 4,
-      borderColor: '#d8b4fe',
-      backgroundColor: '#6d28d9',
+      borderColor: colors.lilac,
+      backgroundColor: colors.brand,
     },
+    back: { alignSelf: 'flex-start', marginBottom: 18, marginTop: -28 },
+    backText: { color: colors.lilac, fontSize: 13, fontWeight: '700' },
     brand: { color: '#ffffff', fontSize: 28, fontWeight: '800', letterSpacing: -1 },
     eyebrow: {
-      color: '#c4b5fd',
+      color: colors.lilac,
       fontSize: 12,
       fontWeight: '700',
       letterSpacing: 1.4,

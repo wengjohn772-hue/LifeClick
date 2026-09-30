@@ -50,7 +50,8 @@ authRouter.post(
   requireDatabase,
   validateBody(registerSchema),
   asyncRoute(async (req, res) => {
-    const { name, email, password, phone, address, trustedContacts } = req.body;
+    const { name, email, password, phone, address, trustedContacts, accountType, businessName, businessType } =
+      req.body;
 
     if (req.demoMode) {
       return res.status(202).json(
@@ -78,10 +79,20 @@ authRouter.post(
       for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           const result = await client.query(
-            `INSERT INTO users (email, name, phone, address, faf_id, password_hash, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            `INSERT INTO users (email, name, phone, address, faf_id, password_hash, account_type, business_name, business_type, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
              RETURNING ${USER_COLUMNS}`,
-            [email, name, phone, address, generateFafId(), passwordHash]
+            [
+              email,
+              name,
+              phone,
+              address,
+              generateFafId(),
+              passwordHash,
+              accountType,
+              accountType === 'business' ? businessName : null,
+              accountType === 'business' ? businessType ?? null : null,
+            ]
           );
           row = result.rows[0];
           break;

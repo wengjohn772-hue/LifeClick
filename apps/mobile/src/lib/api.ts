@@ -177,6 +177,9 @@ export async function authenticate(payload: {
   phone?: string;
   address?: string;
   trustedContacts?: TrustedContact[];
+  accountType?: 'individual' | 'business';
+  businessName?: string;
+  businessType?: string;
 }): Promise<AuthResult> {
   const isRegister = payload.mode === 'register';
   const body = isRegister
@@ -187,6 +190,9 @@ export async function authenticate(payload: {
         phone: payload.phone,
         address: payload.address,
         trustedContacts: payload.trustedContacts ?? [],
+        accountType: payload.accountType ?? 'individual',
+        ...(payload.businessName ? { businessName: payload.businessName } : {}),
+        ...(payload.businessType ? { businessType: payload.businessType } : {}),
       }
     : { email: payload.email, password: payload.password, method: 'email' as const };
 

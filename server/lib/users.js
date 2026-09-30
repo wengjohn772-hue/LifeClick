@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 
 export const USER_COLUMNS = `
   id, email, name, phone, address, faf_id, avatar_id, role,
-  posts_enabled, feeds_enabled, created_at
+  posts_enabled, feeds_enabled, account_type, business_name, business_type, created_at
 `;
 
 export function serializeUser(row, provider = 'email') {
@@ -18,6 +18,12 @@ export function serializeUser(row, provider = 'email') {
     role: row.role || 'Member',
     postsEnabled: row.posts_enabled ?? true,
     feedsEnabled: row.feeds_enabled ?? true,
+    // Fixed at signup. Deliberately not patchable: it is the boundary the
+    // Business product will eventually be split along, so an account must
+    // belong to exactly one product for its whole life.
+    accountType: row.account_type === 'business' ? 'business' : 'individual',
+    businessName: row.business_name || undefined,
+    businessType: row.business_type || undefined,
     provider,
   };
 }

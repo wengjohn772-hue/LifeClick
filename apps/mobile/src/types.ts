@@ -1,7 +1,13 @@
 export type Tab = 'checkin' | 'map' | 'faf' | 'feeds' | 'safety' | 'settings';
 
+export type AccountType = 'individual' | 'business';
+
 export interface AuthUser {
   id: string | number;
+  /** Fixed at signup; decides which product the account belongs to. */
+  accountType?: AccountType;
+  businessName?: string;
+  businessType?: string;
   name: string;
   email: string;
   provider?: string;

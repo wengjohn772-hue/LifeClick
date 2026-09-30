@@ -29,7 +29,11 @@ const COLUMN_BY_FIELD = {
   role: 'role',
   postsEnabled: 'posts_enabled',
   feedsEnabled: 'feeds_enabled',
+  businessName: 'business_name',
+  businessType: 'business_type',
 };
+
+// account_type is intentionally absent: it is fixed at signup.
 
 profileRouter.patch(
   '/',
