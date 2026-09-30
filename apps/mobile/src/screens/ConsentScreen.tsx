@@ -8,7 +8,7 @@ import type { Palette } from '../theme';
 import type { ConsentChoices } from '../types';
 
 /**
- * Shown before monitoring begins. LifeClick processes location, background
+ * Shown before monitoring begins. Inertia processes location, background
  * position, and IP addresses — none of which is lawful or honest to collect
  * without the user knowing specifically what they are agreeing to, so each
  * purpose is a separate switch rather than one blanket "I agree".
@@ -25,13 +25,13 @@ const ITEMS: Item[] = [
   {
     key: 'locationTracking',
     title: 'Location while using the app',
-    body: 'Your position is recorded while LifeClick is open so your map is live and your trusted contacts can be told where you were last seen.',
+    body: 'Your position is recorded while Inertia is open so your map is live and your trusted contacts can be told where you were last seen.',
     required: true,
   },
   {
     key: 'backgroundMonitoring',
     title: 'Location in the background',
-    body: 'LifeClick keeps checking your position when the app is closed. This is what lets it notice you have gone quiet while your phone is in your pocket.',
+    body: 'Inertia keeps checking your position when the app is closed. This is what lets it notice you have gone quiet while your phone is in your pocket.',
     required: false,
   },
   {
@@ -80,7 +80,7 @@ export function ConsentScreen({ termsVersion, onDone }: { termsVersion: string; 
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>Before we start</Text>
-        <Text style={styles.title}>What LifeClick collects</Text>
+        <Text style={styles.title}>What Inertia collects</Text>
         <Text style={styles.subtitle}>
           This is a safety app, so it handles sensitive data. Choose what you are comfortable with. You can change
           or withdraw any of this later in Settings.
@@ -99,7 +99,7 @@ export function ConsentScreen({ termsVersion, onDone }: { termsVersion: string; 
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
             {item.required ? (
-              <Text style={styles.requiredTag}>Required for LifeClick to work</Text>
+              <Text style={styles.requiredTag}>Required for Inertia to work</Text>
             ) : (
               <Text style={styles.optionalTag}>Optional — the app still works without it</Text>
             )}
@@ -126,7 +126,7 @@ export function ConsentScreen({ termsVersion, onDone }: { termsVersion: string; 
 
         {!requiredAccepted ? (
           <Text style={styles.blocked}>
-            Location and sign-in logging are required — without them LifeClick cannot tell whether you are safe.
+            Location and sign-in logging are required — without them Inertia cannot tell whether you are safe.
           </Text>
         ) : null}
         {error ? <Text style={[shared.message, shared.errorMessage]}>{error}</Text> : null}

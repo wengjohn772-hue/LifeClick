@@ -51,7 +51,7 @@ export function requireDatabase(req, res, next) {
   }
 
   return res.status(503).json({
-    error: 'The LifeClick database is not configured. Set DATABASE_URL, or set ALLOW_DEMO_AUTH=true for prototype use.',
+    error: 'The Inertia database is not configured. Set DATABASE_URL, or set ALLOW_DEMO_AUTH=true for prototype use.',
     code: 'database_unavailable',
   });
 }

@@ -70,11 +70,11 @@ export interface Copy {
 }
 
 const individualCopy: Copy = {
-  productName: 'LifeClick',
+  productName: 'Inertia',
   tabs: { checkin: 'Check in', map: 'Map', faf: 'FaF', feeds: 'Feeds', safety: 'Safety', settings: 'Settings' },
 
   checkIn: {
-    eyebrow: 'LifeClick safety',
+    eyebrow: 'Inertia safety',
     title: 'Check in',
     subtitle: 'One tap tells your circle you are okay.',
     timerOn: 'Timer running',
@@ -101,7 +101,7 @@ const individualCopy: Copy = {
     title: 'Safety dashboard',
     subtitle: 'A quiet watch over your check-in behaviour.',
     disclaimer:
-      'Missed check-ins are detected by LifeClick’s servers, but trusted-contact escalation has not been tested on real devices yet. Do not rely on this as an emergency service.',
+      'Missed check-ins are detected by Inertia’s servers, but trusted-contact escalation has not been tested on real devices yet. Do not rely on this as an emergency service.',
   },
 
   feeds: {
@@ -129,7 +129,7 @@ const individualCopy: Copy = {
 };
 
 const businessCopy: Copy = {
-  productName: 'LifeClick Business',
+  productName: 'Inertia Business',
   tabs: { checkin: 'Shift', map: 'Map', faf: 'Team', feeds: 'Reports', safety: 'Safety', settings: 'Settings' },
 
   checkIn: {
@@ -161,7 +161,7 @@ const businessCopy: Copy = {
     title: 'Safety dashboard',
     subtitle: 'Check-in compliance and risk across your shifts.',
     disclaimer:
-      'Missed check-ins are detected by LifeClick’s servers, but escalation has not been tested on real devices yet. This does not replace your own lone-worker procedures or an emergency service.',
+      'Missed check-ins are detected by Inertia’s servers, but escalation has not been tested on real devices yet. This does not replace your own lone-worker procedures or an emergency service.',
   },
 
   feeds: {

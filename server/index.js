@@ -114,7 +114,7 @@ export default app;
 
 if (!process.env.VERCEL) {
   app.listen(config.port, () => {
-    console.log(`LifeClick backend running on http://localhost:${config.port}`);
+    console.log(`Inertia backend running on http://localhost:${config.port}`);
     if (!hasDatabase()) {
       console.log(
         config.allowDemoAuth

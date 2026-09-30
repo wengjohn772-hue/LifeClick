@@ -65,7 +65,7 @@ export function MapScreen({
       <View style={[styles.statusCard, { backgroundColor: backgroundActive ? colors.safeSoft : colors.warnSoft }]}>
         <Text style={[styles.statusText, { color: backgroundActive ? colors.safe : colors.warn }]}>
           {backgroundActive
-            ? 'Background monitoring is active — LifeClick keeps watching when the app is closed.'
+            ? 'Background monitoring is active — Inertia keeps watching when the app is closed.'
             : 'Background monitoring is off. Allow location "Always" to stay protected when the app is closed.'}
         </Text>
       </View>

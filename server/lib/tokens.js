@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query } from '../db/pool.js';
 
-const ISSUER = 'lifeclick';
+const ISSUER = 'inertia';
 
 export function signAccessToken(user) {
   return jwt.sign(

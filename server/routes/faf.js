@@ -95,7 +95,7 @@ fafRouter.post(
     // Deliberately the same answer as "no such ID": otherwise this endpoint
     // becomes a way to enumerate which FaF IDs exist.
     if (!target || target.id === req.user.id) {
-      return res.status(404).json({ error: 'No LifeClick user has that FaF ID.', code: 'faf_not_found' });
+      return res.status(404).json({ error: 'No Inertia user has that FaF ID.', code: 'faf_not_found' });
     }
 
     const { rows: existing } = await query(
@@ -131,7 +131,7 @@ fafRouter.post(
 
     const push = await pushTo(
       target.id,
-      'LifeClick pairing request',
+      'Inertia pairing request',
       `${me[0].name} wants to connect with you on Find a Friend and share live location.`,
       { type: 'faf_request', connectionId: String(rows[0].id) }
     );

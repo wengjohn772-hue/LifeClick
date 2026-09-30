@@ -1,6 +1,6 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000')).replace(/\/$/, '');
 
-const TOKEN_STORAGE_KEY = 'lifeclick.tokens';
+const TOKEN_STORAGE_KEY = 'inertia.tokens';
 
 export interface StoredTokens {
   accessToken: string;

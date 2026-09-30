@@ -1,10 +1,10 @@
-# LifeClick Architecture Handoff
+# Inertia Architecture Handoff
 
 This document records the current architecture, completed work, target platform, and remaining delivery tasks so development can resume without losing context.
 
 ## Current Status
 
-LifeClick is a strong investor/demo MVP with an Expo mobile app that now builds, authenticates securely, and runs its safety loop correctly. It is **not yet ready for a public safety-service launch**: missed-check detection still runs on the device and trusted-contact escalation (Phase 3) does not exist.
+Inertia is a strong investor/demo MVP with an Expo mobile app that now builds, authenticates securely, and runs its safety loop correctly. It is **not yet ready for a public safety-service launch**: missed-check detection still runs on the device and trusted-contact escalation (Phase 3) does not exist.
 
 Baseline commit before the hardening pass:
 
@@ -15,13 +15,13 @@ c0a00ad Add native satellite map
 Repository:
 
 ```text
-https://github.com/wengjohn772-hue/LifeClick
+https://github.com/wengjohn772-hue/Inertia
 ```
 
 ## Repository Structure
 
 ```text
-LifeClick/
+Inertia/
   src/                         Vite React web MVP
   server/                      Express API and PostgreSQL schema
     index.js
@@ -76,7 +76,7 @@ server/         API, workers, schedulers, and database migrations
 ## Completed Web MVP
 
 - Vite React TypeScript application
-- Animated LifeClick splash logo
+- Animated Inertia splash logo
 - Login and account creation screens
 - Google OAuth URL foundation
 - Profile management
@@ -130,9 +130,9 @@ apps/mobile/
 Completed:
 
 - Expo TypeScript project
-- LifeClick app name and slug
-- iOS bundle ID: `com.lifeclick.app`
-- Android package: `com.lifeclick.app`
+- Inertia app name and slug
+- iOS bundle ID: `com.inertia.app`
+- Android package: `com.inertia.app`
 - Native login and account creation
 - Trusted-contact onboarding
 - Native tab shell
@@ -343,7 +343,7 @@ Suggested roles:
 Local development uses:
 
 ```env
-DATABASE_URL=postgresql://USERNAME:PASSWORD@HOST:5432/lifeclick
+DATABASE_URL=postgresql://USERNAME:PASSWORD@HOST:5432/inertia
 PORT=4000
 JWT_SECRET=                       # required in production; openssl rand -base64 48
 ALLOWED_ORIGINS=http://localhost:5173
@@ -391,7 +391,7 @@ Google Maps billing can remain suspended during MVP development. The mobile map 
 
 ## Definition of Full Launch
 
-LifeClick is ready for a full iOS/Android launch when:
+Inertia is ready for a full iOS/Android launch when:
 
 - Authentication is secure.
 - Every private API route is authorized.

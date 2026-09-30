@@ -176,7 +176,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
       ) : (
         <>
           <Text style={shared.sectionTitle}>Choose an avatar</Text>
-          <Text style={shared.sectionHint}>Used across LifeClick. Nothing is uploaded.</Text>
+          <Text style={shared.sectionHint}>Used across Inertia. Nothing is uploaded.</Text>
           <View style={styles.avatarRow}>
             {appAvatars.map((avatar) => {
               const selected = avatar.id === avatarId;

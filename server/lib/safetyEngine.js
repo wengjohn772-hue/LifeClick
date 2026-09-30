@@ -131,8 +131,8 @@ async function openIncident(user) {
 
   const push = await pushToUser(
     user.user_id,
-    'LifeClick: are you safe?',
-    'Your check-in is overdue. Open LifeClick to confirm you are okay.',
+    'Inertia: are you safe?',
+    'Your check-in is overdue. Open Inertia to confirm you are okay.',
     { type: 'check_in_overdue', incidentId: incident.id }
   );
 
@@ -154,7 +154,7 @@ async function openIncident(user) {
 /**
  * Stage 2: still no response after the grace period. Alert trusted contacts.
  *
- * Contacts who are themselves LifeClick users are reached by push. Everyone
+ * Contacts who are themselves Inertia users are reached by push. Everyone
  * else is recorded as `pending_sms` — visible, auditable, and ready for an SMS
  * provider to pick up, rather than silently dropped.
  */
@@ -187,7 +187,7 @@ async function escalateIncident(incident) {
     ? ` Last known location: ${Number(incident.last_latitude).toFixed(4)}, ${Number(incident.last_longitude).toFixed(4)}.`
     : '';
   const title = `${owner.name} may need help`;
-  const body = `${owner.name} missed a LifeClick safety check-in and has not responded.${where}`;
+  const body = `${owner.name} missed a Inertia safety check-in and has not responded.${where}`;
 
   let notified = 0;
 
@@ -202,7 +202,7 @@ async function escalateIncident(incident) {
       if (push.attempted === 0) {
         await logNotification(incident.id, 'push', contact.phone, 'contact', {
           status: 'unavailable',
-          detail: 'Contact has a LifeClick account but no registered device.',
+          detail: 'Contact has a Inertia account but no registered device.',
         });
         continue;
       }
@@ -222,7 +222,7 @@ async function escalateIncident(incident) {
       // provider can be added without losing the escalation history.
       await logNotification(incident.id, 'sms', contact.phone, 'contact', {
         status: 'pending_sms',
-        detail: 'No SMS provider configured and contact is not a LifeClick user.',
+        detail: 'No SMS provider configured and contact is not a Inertia user.',
       });
     }
   }

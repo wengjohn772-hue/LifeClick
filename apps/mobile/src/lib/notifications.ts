@@ -94,9 +94,9 @@ export async function releasePushToken() {
   await removeItem(StorageKeys.pushToken);
 }
 
-const REMINDER_CATEGORY = 'lifeclick.checkin.reminder';
+const REMINDER_CATEGORY = 'inertia.checkin.reminder';
 
-// Tracked so only LifeClick's own reminder is cancelled. The previous
+// Tracked so only Inertia's own reminder is cancelled. The previous
 // implementation called cancelAllScheduledNotificationsAsync(), which wiped
 // every scheduled notification the app had.
 let scheduledReminderId: string | null = null;
@@ -122,7 +122,7 @@ export async function scheduleCheckInReminder(deadline: number, leadMinutes: num
 
   scheduledReminderId = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'LifeClick reminder',
+      title: 'Inertia reminder',
       body:
         leadMinutes === 1
           ? 'Your safety check-in is due in one minute.'
@@ -146,7 +146,7 @@ export async function scheduleCheckInReminder(deadline: number, leadMinutes: num
 export async function notifyMissedCheckIn() {
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'LifeClick check-in missed',
+      title: 'Inertia check-in missed',
       body: 'Please confirm you are safe.',
       sound: 'default',
       ...(Platform.OS === 'android' ? { channelId: SAFETY_CHANNEL_ID } : {}),

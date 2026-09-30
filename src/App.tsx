@@ -24,7 +24,7 @@ type AuthMode = 'login' | 'register';
 const defaultProfile: Profile = {
   name: 'Ava Brooks',
   fafId: 'FAF-2048',
-  email: 'ava@lifeclick.app',
+  email: 'ava@inertia.app',
   phone: '+1 (415) 555-0147',
   address: '104 Cedar Lane, Austin, TX',
   avatarId: 'violet',
@@ -41,7 +41,7 @@ function LogoPulse() {
       <svg
         viewBox="0 70 455 100"
         role="img"
-        aria-label="LifeClick"
+        aria-label="Inertia"
         className="relative h-auto w-full drop-shadow-[0_10px_18px_rgba(76,29,149,0.18)]"
       >
         <text
@@ -53,7 +53,7 @@ function LogoPulse() {
           fontWeight="700"
           letterSpacing="-3"
         >
-          LifeClick
+          Inertia
         </text>
         <path
           d="M17 151H164l12-1 9-17 10 48 12-76 13 45h166l10-16 8 20 10-12 9 10h17"
@@ -147,14 +147,14 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
     const timer = window.setInterval(() => {
       const remaining = nextCheckInAt - Date.now();
       if (remind && remaining > 0 && remaining <= 5 * 60 * 1000 && reminderSentFor !== nextCheckInAt && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('LifeClick reminder', { body: 'Your safety check-in is due in five minutes.' });
+        new Notification('Inertia reminder', { body: 'Your safety check-in is due in five minutes.' });
         reminderSentFor = nextCheckInAt;
       }
       if (remaining > 0) return;
       setBehaviorScore((previous) => Math.max(0, previous - 10));
       setMissedClicks((previous) => {
         if (previous === 0 && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('LifeClick check-in missed', { body: 'Please confirm you are safe.' });
+          new Notification('Inertia check-in missed', { body: 'Please confirm you are safe.' });
         }
         return previous + 1;
       });
@@ -193,7 +193,7 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
       }
 
       const loginPayload = {
-        email: email || 'ava@lifeclick.app',
+        email: email || 'ava@inertia.app',
         password: password || 'demo-pass',
         method: authMethod,
       };
@@ -265,8 +265,8 @@ export function App({ initialTab = 'map', initialTheme = 'light' }: AppProps) {
             </div>
 
             <div className="mb-5 text-center">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-300">{authMode === 'login' ? 'Welcome back' : 'Join LifeClick'}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{authMode === 'login' ? 'LifeClick' : 'Create account'}</h2>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-violet-300">{authMode === 'login' ? 'Welcome back' : 'Join Inertia'}</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{authMode === 'login' ? 'Inertia' : 'Create account'}</h2>
             </div>
 
             <div className="mb-4 flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-xs font-semibold text-violet-100">

@@ -113,7 +113,7 @@ export function FafScreen() {
       say(
         result.notified
           ? `Request sent to ${result.request.person.name}. Waiting for them to permit it.`
-          : `Request sent to ${result.request.person.name}, but they have no device registered yet, so they will only see it when they open LifeClick.`
+          : `Request sent to ${result.request.person.name}, but they have no device registered yet, so they will only see it when they open Inertia.`
       );
       await refresh();
     } catch (error) {

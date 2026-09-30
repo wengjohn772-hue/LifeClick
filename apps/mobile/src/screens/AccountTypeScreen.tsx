@@ -55,11 +55,11 @@ export function AccountTypeScreen({ onChoose }: { onChoose: (brand: Brand) => vo
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.brandRow}>
             <View style={styles.pulseDot} />
-            <Text style={styles.brandName}>LifeClick</Text>
+            <Text style={styles.brandName}>Inertia</Text>
           </View>
 
           <Text style={styles.eyebrow}>Welcome</Text>
-          <Text style={styles.title}>How will you use LifeClick?</Text>
+          <Text style={styles.title}>How will you use Inertia?</Text>
           <Text style={styles.subtitle}>
             This sets up the right app for you. It is fixed once your account is created, so pick the one that
             matches how you will actually use it.

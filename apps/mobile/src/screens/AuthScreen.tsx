@@ -93,7 +93,7 @@ export function AuthScreen({ onBack }: { onBack?: () => void }) {
         });
       }
     } catch (error) {
-      fail(error instanceof Error ? error.message : 'Unable to reach LifeClick.');
+      fail(error instanceof Error ? error.message : 'Unable to reach Inertia.');
     } finally {
       setBusy(false);
     }

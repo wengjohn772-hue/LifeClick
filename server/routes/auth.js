@@ -148,7 +148,7 @@ authRouter.post(
       return res.json(
         demoSession({
           id: 'demo-user',
-          name: method === 'google' ? 'Ava Brooks' : 'LifeClick User',
+          name: method === 'google' ? 'Ava Brooks' : 'Inertia User',
           email,
           fafId: 'FAF-DEMO',
           provider: method,

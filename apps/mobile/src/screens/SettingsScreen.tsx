@@ -93,7 +93,7 @@ export function SettingsScreen({
   const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete account',
-      'This permanently deletes your LifeClick account, check-in history, location history, and trusted contacts. This cannot be undone.',
+      'This permanently deletes your Inertia account, check-in history, location history, and trusted contacts. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

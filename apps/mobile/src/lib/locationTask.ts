@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { loadTokens, saveLocation } from './api';
 
-export const BACKGROUND_LOCATION_TASK = 'lifeclick-background-location';
+export const BACKGROUND_LOCATION_TASK = 'inertia-background-location';
 
 /**
  * Expo Go's binary ships without the iOS background-location entitlement and
@@ -84,7 +84,7 @@ export async function startBackgroundTracking(): Promise<{ started: boolean; rea
     if (!background.granted) {
       return {
         started: false,
-        reason: 'Allow location "Always" so LifeClick can watch over you when the app is closed.',
+        reason: 'Allow location "Always" so Inertia can watch over you when the app is closed.',
       };
     }
 
@@ -97,7 +97,7 @@ export async function startBackgroundTracking(): Promise<{ started: boolean; rea
       pausesUpdatesAutomatically: false,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
-        notificationTitle: 'LifeClick safety monitoring',
+        notificationTitle: 'Inertia safety monitoring',
         notificationBody: 'Your location is being monitored so your contacts can be alerted.',
         notificationColor: '#6d28d9',
       },

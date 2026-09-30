@@ -7,13 +7,13 @@ const webFallback = new Map<string, string>();
 const isWeb = Platform.OS === 'web';
 
 export const StorageKeys = {
-  session: 'lifeclick.session',
-  tokens: 'lifeclick.tokens',
-  safety: 'lifeclick.safety',
-  pushToken: 'lifeclick.pushToken',
-  theme: 'lifeclick.theme',
+  session: 'inertia.session',
+  tokens: 'inertia.tokens',
+  safety: 'inertia.safety',
+  pushToken: 'inertia.pushToken',
+  theme: 'inertia.theme',
   /** Which product was chosen on this device before any account exists. */
-  brand: 'lifeclick.brand',
+  brand: 'inertia.brand',
 } as const;
 
 export async function getItem(key: string): Promise<string | null> {

@@ -1,10 +1,10 @@
 {
-  "name": "mobile",
+  "name": "inertia-mobile",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "expo": "~57.0.23",
-    "expo-constants": "~57.0.18",
+    "expo": "~57.0.26",
+    "expo-constants": "~57.0.20",
     "expo-device": "~57.0.2",
     "expo-image": "~57.0.5",
     "expo-image-manipulator": "~57.0.18",

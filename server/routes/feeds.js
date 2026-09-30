@@ -32,8 +32,8 @@ async function audienceFor(req) {
 }
 
 const DEMO_POSTS = [
-  { id: 'demo-1', userId: 'user-7F42', area: 'Riverside Dr.', country: 'Nigeria', state: 'Lagos', tag: 'Notice', body: 'Streetlights are out along the whole stretch past the bridge.', likes: 12, reposts: 3, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/lifeclick-riverside/800/500', mine: false, createdAt: new Date().toISOString() },
-  { id: 'demo-2', userId: 'user-3K91', area: 'Market Square', country: 'Nigeria', state: 'Lagos', tag: 'Alert', body: 'Keep devices out of sight while waiting near the taxi rank.', likes: 41, reposts: 18, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/lifeclick-market/800/500', mine: false, createdAt: new Date().toISOString() },
+  { id: 'demo-1', userId: 'user-7F42', area: 'Riverside Dr.', country: 'Nigeria', state: 'Lagos', tag: 'Notice', body: 'Streetlights are out along the whole stretch past the bridge.', likes: 12, reposts: 3, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/inertia-riverside/800/500', mine: false, createdAt: new Date().toISOString() },
+  { id: 'demo-2', userId: 'user-3K91', area: 'Market Square', country: 'Nigeria', state: 'Lagos', tag: 'Alert', body: 'Keep devices out of sight while waiting near the taxi rank.', likes: 41, reposts: 18, likedByMe: false, repostedByMe: false, imageUrl: 'https://picsum.photos/seed/inertia-market/800/500', mine: false, createdAt: new Date().toISOString() },
 ];
 
 /**

@@ -32,7 +32,7 @@ export function errorHandler(error, _req, res, _next) {
   }
 
   if (isConnectionError(error)) {
-    return res.status(503).json({ error: 'The LifeClick database is unavailable.', code: 'database_unavailable' });
+    return res.status(503).json({ error: 'The Inertia database is unavailable.', code: 'database_unavailable' });
   }
 
   // body-parser rejects oversized bodies before any route runs; without this it

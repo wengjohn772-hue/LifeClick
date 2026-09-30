@@ -1,6 +1,6 @@
-# LifeClick
+# Inertia
 
-LifeClick is a proactive personal-safety app: a check-in timer, trusted contacts, live location, and a risk dashboard.
+Inertia is a proactive personal-safety app: a check-in timer, trusted contacts, live location, and a risk dashboard.
 
 The repository holds three pieces:
 
@@ -46,7 +46,7 @@ See `.env.example` (server and web) and `apps/mobile/.env.example` (mobile). Two
 Any PostgreSQL works — local, Neon, Supabase, Railway.
 
 ```sql
-CREATE DATABASE lifeclick;
+CREATE DATABASE inertia;
 ```
 
 Then set `DATABASE_URL` and start the API. **Migrations run automatically on first request.** They live in `server/db/migrations/` as JS modules (not a runtime file read, which Vercel's bundler cannot trace) and are tracked in a `schema_migrations` table, so they apply exactly once and are safe to re-run.
@@ -125,11 +125,11 @@ Also schedule `/api/jobs/prune` (hourly or daily) to enforce retention.
 
 ### Escalation channels
 
-Trusted contacts who are themselves LifeClick users are reached by Expo push (free, no credentials). Contacts who aren't are recorded as `pending_sms` in `incident_notifications` — visible and auditable rather than silently dropped, and ready for an SMS provider to pick up. Adding Twilio means implementing one sender against that table; nothing else changes.
+Trusted contacts who are themselves Inertia users are reached by Expo push (free, no credentials). Contacts who aren't are recorded as `pending_sms` in `incident_notifications` — visible and auditable rather than silently dropped, and ready for an SMS provider to pick up. Adding Twilio means implementing one sender against that table; nothing else changes.
 
 ## Privacy, consent, and the security log
 
-LifeClick processes location, background position, and IP addresses. Each purpose is consented to **separately** on first run (`ConsentScreen`), and the agreed terms version is stored in `user_consents`.
+Inertia processes location, background position, and IP addresses. Each purpose is consented to **separately** on first run (`ConsentScreen`), and the agreed terms version is stored in `user_consents`.
 
 | Data | Table | Retention |
 | --- | --- | --- |
