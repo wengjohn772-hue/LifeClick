@@ -34,6 +34,12 @@
         }
       ],
       [
+        "expo-sensors",
+        {
+          "motionPermission": "Inertia uses motion data to detect a collision or a fall so your emergency contacts can be alerted."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

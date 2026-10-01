@@ -154,3 +154,72 @@ export async function notifyMissedCheckIn() {
     trigger: null, // Deliver immediately.
   });
 }
+
+
+/* ------------------------------------------------- impact confirmation */
+
+// Tracked so the reminders can be cancelled the moment the user responds —
+// cancelAllScheduledNotificationsAsync would also wipe the check-in reminder.
+let impactReminderIds: string[] = [];
+
+function impactLabel(kind: 'impact' | 'crash' | 'fall') {
+  if (kind === 'crash') return 'a possible collision';
+  if (kind === 'fall') return 'a possible fall';
+  return 'a heavy impact';
+}
+
+/** Fires immediately when an impact is detected. */
+export async function notifyImpactDetected(kind: 'impact' | 'crash' | 'fall', seconds: number) {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Are you OK?',
+      body: `Inertia detected ${impactLabel(kind)}. Your contacts are alerted in ${seconds}s unless you respond.`,
+      sound: 'default',
+      ...(Platform.OS === 'android' ? { channelId: SAFETY_CHANNEL_ID } : {}),
+    },
+    trigger: null,
+  });
+}
+
+/**
+ * Keeps reminding for the whole confirmation window.
+ *
+ * Scheduled as a fixed set of one-shot notifications rather than a repeating
+ * trigger: repeating triggers have a minimum interval far longer than this
+ * window, and a reminder that arrives after the deadline is worse than useless.
+ */
+export async function startImpactReminders(kind: 'impact' | 'crash' | 'fall', totalSeconds: number, everySeconds = 20) {
+  await cancelImpactReminders();
+
+  const ids: string[] = [];
+  for (let at = everySeconds; at < totalSeconds; at += everySeconds) {
+    const remaining = totalSeconds - at;
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: remaining <= 30 ? 'Still there? Alerting your contacts soon' : 'Are you OK?',
+          body: `Inertia detected ${impactLabel(kind)}. Tap to confirm you are safe — ${remaining}s left.`,
+          sound: 'default',
+          ...(Platform.OS === 'android' ? { channelId: SAFETY_CHANNEL_ID } : {}),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: at,
+          repeats: false,
+          ...(Platform.OS === 'android' ? { channelId: SAFETY_CHANNEL_ID } : {}),
+        },
+      });
+      ids.push(id);
+    } catch {
+      // One reminder failing to schedule must not abort the rest.
+    }
+  }
+  impactReminderIds = ids;
+}
+
+export async function cancelImpactReminders() {
+  for (const id of impactReminderIds) {
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
+  }
+  impactReminderIds = [];
+}

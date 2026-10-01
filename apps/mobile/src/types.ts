@@ -167,3 +167,66 @@ export interface AuthResult {
   demo?: boolean;
   message?: string;
 }
+
+/* ------------------------------------------------- sensors & patterns */
+
+export type ImpactKind = 'impact' | 'crash' | 'fall';
+
+export interface PendingImpact {
+  id: string;
+  kind: ImpactKind;
+  peakG?: number | null;
+  confirmDeadline: string;
+  secondsRemaining: number;
+}
+
+export interface ImpactRecord {
+  id: string;
+  kind: ImpactKind;
+  peakG: number | null;
+  followedByStillness: boolean;
+  status: 'pending' | 'cancelled' | 'escalated' | 'expired';
+  detectedAt: string;
+  resolvedAt: string | null;
+}
+
+export interface LearnedPlace {
+  id: string;
+  label: string | null;
+  latitude: number;
+  longitude: number;
+  visits: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface LearnedRoute {
+  id: string;
+  count: number;
+  from: { id: string; label: string | null; latitude: number; longitude: number };
+  to: { id: string; label: string | null; latitude: number; longitude: number };
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface PatternAlert {
+  id: string;
+  kind: 'new_place' | 'new_route';
+  detail: string | null;
+  at: string;
+  acknowledged: boolean;
+}
+
+export interface PatternSummary {
+  learning: boolean;
+  placesKnown: number;
+  places: LearnedPlace[];
+  routes: LearnedRoute[];
+  alerts: PatternAlert[];
+}
+
+export interface StepSummaryResult {
+  today: number;
+  average: number;
+  days: Array<{ day: string; steps: number; source: string }>;
+}

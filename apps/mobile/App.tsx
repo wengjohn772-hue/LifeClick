@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { SessionProvider, useSession } from './src/state/session';
 import { SafetyProvider } from './src/state/safety';
+import { SensorsProvider } from './src/state/sensors';
 import { ThemeProvider, useTheme } from './src/state/theme';
 import { StorageKeys, getItem } from './src/lib/storage';
 import { AccountTypeScreen } from './src/screens/AccountTypeScreen';
@@ -75,7 +76,10 @@ function Root() {
   // timer, scores, and scheduled reminders rather than carrying them over.
   return (
     <SafetyProvider key={String(user.id)}>
-      {isBusiness ? <BusinessShell /> : <MobileShell />}
+      {/* Impact monitoring only runs for a signed-in, consented session. */}
+      <SensorsProvider enabled>
+        {isBusiness ? <BusinessShell /> : <MobileShell />}
+      </SensorsProvider>
     </SafetyProvider>
   );
 }

@@ -240,6 +240,104 @@ async function escalateIncident(incident) {
  * incident stages gate every side effect, and the partial unique index
  * guarantees a single open incident per user.
  */
+
+/** Tells the user a new place or route was recorded. */
+export async function notifyPatternNovelty(userId, kind) {
+  const isPlace = kind === 'new_place';
+  await pushToUser(
+    userId,
+    isPlace ? 'New place recorded' : 'New route recorded',
+    isPlace
+      ? 'Inertia has not seen you here before. Open Safety to review or name this place.'
+      : 'That journey is new for you. Open Safety to review your movement patterns.',
+    { type: 'pattern_novelty', kind }
+  );
+}
+
+/**
+ * Impact confirmations that nobody answered.
+ *
+ * The countdown is held server-side because a phone in a real collision may be
+ * destroyed, out of battery, or thrown clear — any of which would stop a
+ * device-side timer and mean nobody is ever told. Each pass also re-sends the
+ * reminder while the window is still open.
+ */
+async function sweepImpacts() {
+  const reminded = [];
+  const escalated = [];
+
+  // Still within the window: nudge again so a conscious user cannot miss it.
+  const { rows: pending } = await query(
+    `SELECT id, user_id, kind, confirm_deadline
+     FROM sensor_events
+     WHERE status = 'pending' AND confirm_deadline > NOW()
+     LIMIT 200`
+  );
+
+  for (const event of pending) {
+    const seconds = Math.max(0, Math.round((new Date(event.confirm_deadline).getTime() - Date.now()) / 1000));
+    try {
+      await pushToUser(
+        event.user_id,
+        'Are you OK?',
+        `Inertia detected ${describeImpact(event.kind)}. Your contacts are alerted in ${seconds}s unless you respond.`,
+        { type: 'impact_confirm', eventId: String(event.id), secondsRemaining: seconds }
+      );
+      reminded.push(event.id);
+    } catch (error) {
+      console.error(`[sweep] impact reminder failed for ${event.id}:`, error.message);
+    }
+  }
+
+  // Window elapsed with no response: raise risk and escalate.
+  const { rows: expired } = await query(
+    `SELECT id, user_id, kind, peak_g, latitude, longitude
+     FROM sensor_events
+     WHERE status = 'pending' AND confirm_deadline <= NOW()
+     LIMIT 200`
+  );
+
+  for (const event of expired) {
+    try {
+      const { rows: incidentRows } = await query(
+        `INSERT INTO incidents (user_id, missed_deadline_at, status, stage, last_latitude, last_longitude, last_location_at)
+         VALUES ($1, NOW(), 'open', 'user_notified', $2, $3, NOW())
+         ON CONFLICT (user_id) WHERE status = 'open' DO NOTHING
+         RETURNING *`,
+        [event.user_id, event.latitude, event.longitude]
+      );
+
+      // An incident may already be open from a missed check-in; the impact
+      // still resolves, and escalation proceeds on the existing incident.
+      const incident = incidentRows[0] ?? null;
+
+      await query(
+        `UPDATE sensor_events SET status = 'expired', resolved_at = NOW(), incident_id = $2 WHERE id = $1`,
+        [event.id, incident?.id ?? null]
+      );
+
+      if (incident) {
+        await escalateIncident(incident);
+        await query(`UPDATE incidents SET stage = 'contacts_notified', escalated_at = NOW() WHERE id = $1`, [
+          incident.id,
+        ]);
+      }
+
+      escalated.push(event.id);
+    } catch (error) {
+      console.error(`[sweep] impact escalation failed for ${event.id}:`, error.message);
+    }
+  }
+
+  return { reminded: reminded.length, escalated: escalated.length };
+}
+
+function describeImpact(kind) {
+  if (kind === 'crash') return 'a possible collision';
+  if (kind === 'fall') return 'a possible fall';
+  return 'a heavy impact';
+}
+
 export async function runSafetySweep() {
   const startedAt = Date.now();
 
@@ -306,12 +404,23 @@ export async function runSafetySweep() {
     }
   }
 
+  // Impact confirmations run in the same pass, so one scheduler drives both.
+  let impacts = { reminded: 0, escalated: 0 };
+  try {
+    impacts = await sweepImpacts();
+  } catch (error) {
+    console.error('[sweep] impact pass failed:', error.message);
+    failures.push({ stage: 'impacts', error: error.message });
+  }
+
   return {
     ok: failures.length === 0,
     durationMs: Date.now() - startedAt,
     overdueFound: overdue.length,
     incidentsOpened: detected.length,
     incidentsEscalated: escalated.length,
+    impactsReminded: impacts.reminded,
+    impactsEscalated: impacts.escalated,
     escalations: escalated,
     // Surfaced rather than swallowed so a monitoring failure is visible to
     // whatever is calling the sweep.

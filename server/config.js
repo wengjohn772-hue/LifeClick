@@ -71,6 +71,13 @@ export const config = {
   // How long after a missed deadline before trusted contacts are alerted.
   escalationGraceMinutes: Number(process.env.ESCALATION_GRACE_MINUTES || 10),
 
+  // How long someone has to cancel a detected impact before it escalates.
+  // Long enough to find and unlock a phone after a real collision, short
+  // enough that help is not delayed.
+  impactConfirmSeconds: Number(process.env.IMPACT_CONFIRM_SECONDS || 120),
+  // How often the countdown reminder is repeated while it runs.
+  impactReminderSeconds: Number(process.env.IMPACT_REMINDER_SECONDS || 30),
+
   // Audit + retention. Access logging is the high-volume one; it can be turned
   // off without redeploying clients.
   accessLogging: process.env.ACCESS_LOG_ENABLED !== 'false',

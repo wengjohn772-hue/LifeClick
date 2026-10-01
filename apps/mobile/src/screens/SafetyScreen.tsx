@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientScreen } from '../components/GradientScreen';
 import { formatCountdown, useSafety } from '../state/safety';
 import { useTheme } from '../state/theme';
+import { useSensors } from '../state/sensors';
+import { getImpacts, getPatterns, getSteps } from '../lib/api';
+import type { ImpactRecord, PatternSummary, StepSummaryResult } from '../types';
 import { riskColor, riskSoftColor, type Palette } from '../theme';
 
 /** One tile in the 2-column metric grid. */
@@ -66,8 +69,32 @@ export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }
     reportFalseAlert,
   } = useSafety();
 
-  const tone = riskColor(riskScore, colors);
-  const soft = riskSoftColor(riskScore, colors);
+  const { monitoring, stepsToday, simulate } = useSensors();
+  const [patterns, setPatterns] = useState<PatternSummary | null>(null);
+  const [steps, setSteps] = useState<StepSummaryResult | null>(null);
+  const [impacts, setImpacts] = useState<{ events: ImpactRecord[]; riskContribution: number } | null>(null);
+
+  const loadSignals = useCallback(async () => {
+    const [p, st, im] = await Promise.all([
+      getPatterns().catch(() => null),
+      getSteps().catch(() => null),
+      getImpacts().catch(() => null),
+    ]);
+    if (p) setPatterns(p);
+    if (st) setSteps(st);
+    if (im) setImpacts(im);
+  }, []);
+
+  useEffect(() => {
+    void loadSignals();
+  }, [loadSignals]);
+
+  // Sensor events feed the headline number, so a detected collision shows up
+  // in risk rather than only in a list further down the screen.
+  const sensorRisk = impacts?.riskContribution ?? 0;
+  const combinedRisk = Math.min(100, riskScore + sensorRisk);
+  const tone = riskColor(combinedRisk, colors);
+  const soft = riskSoftColor(combinedRisk, colors);
   const behaviourTone = behaviorScore >= 80 ? colors.safe : behaviorScore >= 50 ? colors.warn : colors.danger;
 
   return (
@@ -87,21 +114,25 @@ export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }
           <View style={styles.riskHeaderMain}>
             <Text style={shared.cardLabel}>CURRENT RISK</Text>
             <Text style={[styles.riskScore, { color: tone }]}>
-              {riskScore}
+              {combinedRisk}
               <Text style={styles.riskOutOf}>/100</Text>
             </Text>
           </View>
           <View style={[styles.badge, { backgroundColor: soft }]}>
-            <Text style={[styles.badgeText, { color: tone }]}>{riskLevel}</Text>
+            <Text style={[styles.badgeText, { color: tone }]}>
+              {combinedRisk >= 70 ? 'High' : combinedRisk >= 35 ? 'Medium' : riskLevel}
+            </Text>
           </View>
         </View>
 
-        <Meter value={riskScore} tone={tone} track={colors.line} />
+        <Meter value={combinedRisk} tone={tone} track={colors.line} />
 
         <Text style={shared.cardHint}>
-          {riskScore === 0
-            ? 'No concerning signals. Keep checking in to stay here.'
-            : 'Built from recent missed check-ins, timing signals, and reported false alerts.'}
+          {sensorRisk > 0
+            ? `Includes ${sensorRisk} points from a detected impact in the last 24 hours.`
+            : combinedRisk === 0
+              ? 'No concerning signals. Keep checking in to stay here.'
+              : 'Built from recent missed check-ins, timing signals, and reported false alerts.'}
         </Text>
       </LinearGradient>
 
@@ -184,6 +215,97 @@ export function SafetyScreen({ backgroundActive }: { backgroundActive: boolean }
         />
       </View>
 
+      {/* Crash & fall detection */}
+      <Text style={shared.sectionTitle}>Crash &amp; fall detection</Text>
+      <View style={styles.signalCard}>
+        <View style={styles.signalHeader}>
+          <View style={[styles.statusDot, { backgroundColor: monitoring ? colors.safe : colors.warn }]} />
+          <Text style={styles.signalTitle}>{monitoring ? 'Monitoring motion' : 'Not monitoring'}</Text>
+          <Text style={styles.signalMeta}>{`${stepsToday.toLocaleString()} steps`}</Text>
+        </View>
+        <Text style={styles.signalBody}>
+          {monitoring
+            ? 'A detected collision or fall starts a 120-second countdown. Confirm you are safe, or your contacts are alerted automatically.'
+            : 'Motion sensing is unavailable on this device or in Expo Go. A development build is needed for reliable detection.'}
+        </Text>
+
+        {impacts && impacts.events.length > 0 ? (
+          impacts.events.slice(0, 3).map((event) => (
+            <View key={event.id} style={styles.impactRow}>
+              <Text style={styles.impactKind}>
+                {event.kind === 'crash' ? 'Collision' : event.kind === 'fall' ? 'Fall' : 'Impact'}
+                {event.peakG ? ` · ${event.peakG.toFixed(1)}g` : ''}
+              </Text>
+              <Text
+                style={[
+                  styles.impactStatus,
+                  { color: event.status === 'cancelled' ? colors.safe : colors.danger },
+                ]}
+              >
+                {event.status === 'cancelled' ? 'You confirmed safe' : event.status === 'pending' ? 'Awaiting response' : 'Contacts alerted'}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.signalEmpty}>No impacts detected.</Text>
+        )}
+
+        <Pressable onPress={() => void simulate('crash')} style={styles.testButton}>
+          <Text style={styles.testButtonText}>Test the alarm</Text>
+        </Pressable>
+      </View>
+
+      {/* Movement patterns */}
+      <Text style={shared.sectionTitle}>Movement patterns</Text>
+      <View style={styles.signalCard}>
+        {patterns?.learning ? (
+          <>
+            <Text style={styles.signalTitle}>Still learning</Text>
+            <Text style={styles.signalBody}>
+              {`Inertia has learned ${patterns.placesKnown} ${patterns.placesKnown === 1 ? 'place' : 'places'} so far. Once it knows your routine it will tell you when a journey is new.`}
+            </Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.signalHeader}>
+              <Text style={styles.signalTitle}>
+                {`${patterns?.places.length ?? 0} places · ${patterns?.routes.length ?? 0} routes`}
+              </Text>
+            </View>
+            {patterns?.routes.slice(0, 4).map((route) => (
+              <View key={route.id} style={styles.impactRow}>
+                <Text style={styles.impactKind} numberOfLines={1}>
+                  {`${route.from.label ?? 'Place'} → ${route.to.label ?? 'Place'}`}
+                </Text>
+                <Text style={styles.routeCount}>{route.count === 1 ? 'once' : `${route.count}×`}</Text>
+              </View>
+            ))}
+          </>
+        )}
+
+        {patterns?.alerts.slice(0, 3).map((alert) => (
+          <View key={alert.id} style={[styles.alertRow, { backgroundColor: colors.warnSoft }]}>
+            <Text style={[styles.alertText, { color: colors.warn }]}>
+              {alert.kind === 'new_place' ? 'New place visited' : 'New route taken'}
+              {alert.detail ? ` — ${alert.detail}` : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Steps */}
+      <Text style={shared.sectionTitle}>Activity</Text>
+      <View style={styles.signalCard}>
+        <View style={styles.signalHeader}>
+          <Text style={styles.signalTitle}>{`${(steps?.today ?? stepsToday).toLocaleString()} steps today`}</Text>
+          {steps?.average ? <Text style={styles.signalMeta}>{`${steps.average.toLocaleString()} avg`}</Text> : null}
+        </View>
+        <Text style={styles.signalBody}>
+          Step history is read from the device. iOS provides the last seven days; Android has no history API, so its
+          figures cover only time the app was open.
+        </Text>
+      </View>
+
       <Pressable onPress={reportFalseAlert} style={({ pressed }) => [styles.falseAlert, pressed && shared.pressed]}>
         <Text style={styles.falseAlertText}>Report false alert</Text>
       </Pressable>
@@ -250,6 +372,45 @@ const createStyles = (colors: Palette) =>
     statValue: { color: colors.inkStrong, fontSize: 19, fontWeight: '800', marginTop: 3 },
     statDetail: { color: colors.muted, fontSize: 11, lineHeight: 15, marginTop: 3 },
 
+    signalCard: {
+      marginTop: 14,
+      padding: 18,
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    signalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusDot: { width: 9, height: 9, borderRadius: 5 },
+    signalTitle: { color: colors.inkStrong, fontSize: 15, fontWeight: '800', flex: 1 },
+    signalMeta: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+    signalBody: { color: colors.body, fontSize: 13, lineHeight: 19, marginTop: 8 },
+    signalEmpty: { color: colors.muted, fontSize: 13, marginTop: 10 },
+    impactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.line,
+    },
+    impactKind: { color: colors.ink, fontSize: 13, fontWeight: '700', flex: 1 },
+    impactStatus: { fontSize: 12, fontWeight: '800' },
+    routeCount: { color: colors.muted, fontSize: 12, fontWeight: '800' },
+    alertRow: { marginTop: 10, padding: 12, borderRadius: 14 },
+    alertText: { fontSize: 12, lineHeight: 18, fontWeight: '700' },
+    testButton: {
+      marginTop: 14,
+      alignSelf: 'flex-start',
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 999,
+      backgroundColor: colors.brandSoft,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    testButtonText: { color: colors.brand, fontSize: 12, fontWeight: '800' },
     falseAlert: {
       marginTop: 22,
       alignSelf: 'flex-start',

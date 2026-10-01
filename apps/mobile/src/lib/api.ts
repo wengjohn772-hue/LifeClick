@@ -11,8 +11,14 @@ import type {
   FeedPost,
   FeedRegion,
   FeedTag,
+  ImpactRecord,
+  ImpactKind,
   Incident,
+  PatternSummary,
+  PendingImpact,
   ReactionResult,
+  StepSummaryResult,
+  LearnedPlace,
   SafetySettings,
   SecurityActivity,
   TrustedContact,
@@ -348,3 +354,40 @@ export const getFafConnections = () =>
 
 export const disconnectFaf = (id: string) =>
   apiRequest<{ disconnected: boolean }>(`/api/faf/connections/${id}/disconnect`, { method: 'POST' });
+
+/* ----------------------------------------------- sensors & patterns */
+
+export const reportImpact = (payload: {
+  kind: ImpactKind;
+  peakG?: number;
+  followedByStillness?: boolean;
+  riskWeight?: number;
+  latitude?: number;
+  longitude?: number;
+}) =>
+  apiRequest<{ existing: boolean; event: PendingImpact }>('/api/sensors/impacts', {
+    method: 'POST',
+    body: payload,
+  });
+
+export const cancelImpact = (id: string) =>
+  apiRequest<{ cancelled: boolean }>(`/api/sensors/impacts/${id}/cancel`, { method: 'POST' });
+
+export const getPendingImpact = () =>
+  apiRequest<{ event: PendingImpact | null }>('/api/sensors/impacts/pending');
+
+export const getImpacts = () =>
+  apiRequest<{ events: ImpactRecord[]; riskContribution: number }>('/api/sensors/impacts');
+
+export const syncSteps = (days: Array<{ day: string; steps: number }>, source?: 'ios' | 'android' | 'device') =>
+  apiRequest<{ saved: boolean }>('/api/sensors/steps', { method: 'POST', body: { days, source } });
+
+export const getSteps = () => apiRequest<StepSummaryResult>('/api/sensors/steps');
+
+export const getPatterns = () => apiRequest<PatternSummary>('/api/patterns');
+
+export const namePlace = (id: string, label: string) =>
+  apiRequest<{ place: LearnedPlace }>(`/api/patterns/places/${id}`, { method: 'PATCH', body: { label } });
+
+export const acknowledgePatternAlert = (id: string) =>
+  apiRequest<{ acknowledged: boolean }>(`/api/patterns/alerts/${id}/acknowledge`, { method: 'POST' });

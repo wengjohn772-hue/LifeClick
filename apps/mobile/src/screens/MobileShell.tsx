@@ -17,6 +17,8 @@ import { SettingsScreen } from './SettingsScreen';
 import { isBackgroundTrackingActive, isExpoGo, startBackgroundTracking } from '../lib/locationTask';
 import { saveLocation } from '../lib/api';
 import { useSafety } from '../state/safety';
+import { useSensors } from '../state/sensors';
+import { ImpactAlarmScreen } from './ImpactAlarmScreen';
 import { useTheme } from '../state/theme';
 import type { Tab } from '../types';
 
@@ -27,6 +29,7 @@ const FOREGROUND_PERSIST_INTERVAL_MS = 60_000;
 export function MobileShell() {
   const { colors, isDark } = useTheme();
   const { settings, ready, checkIn } = useSafety();
+  const { pending: pendingImpact } = useSensors();
   const [tab, setTab] = useState<Tab>('checkin');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [locationMessage, setLocationMessage] = useState('Requesting location permission…');
@@ -137,6 +140,10 @@ export function MobileShell() {
       receivedSub.remove();
     };
   }, [checkIn]);
+
+  // A live impact countdown pre-empts everything: someone who has just been in
+  // a collision should not have to navigate to respond.
+  if (pendingImpact) return <ImpactAlarmScreen />;
 
   const content =
     tab === 'checkin' ? (

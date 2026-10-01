@@ -14,6 +14,8 @@ import { feedsRouter } from './routes/feeds.js';
 import { pushRouter } from './routes/push.js';
 import { securityRouter } from './routes/security.js';
 import { fafRouter } from './routes/faf.js';
+import { sensorsRouter } from './routes/sensors.js';
+import { patternsRouter } from './routes/patterns.js';
 import { jobsRouter } from './routes/jobs.js';
 import { notFound, errorHandler, asyncRoute } from './middleware/errors.js';
 import { accessLogger } from './lib/audit.js';
@@ -105,6 +107,8 @@ app.use('/api/feeds', feedsRouter);
 app.use('/api/push-tokens', pushRouter);
 app.use('/api/security', securityRouter);
 app.use('/api/faf', fafRouter);
+app.use('/api/sensors', sensorsRouter);
+app.use('/api/patterns', patternsRouter);
 app.use('/api/jobs', jobsRouter);
 
 app.use('/api', notFound);
