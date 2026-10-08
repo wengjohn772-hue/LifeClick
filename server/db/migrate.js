@@ -9,11 +9,12 @@ import * as fafConnections from './migrations/007_faf_connections.js';
 import * as accountTypes from './migrations/008_account_types.js';
 import * as sensorsPatterns from './migrations/009_sensors_and_patterns.js';
 import * as staleStatus from './migrations/010_sensor_event_stale_status.js';
+import * as jobLeases from './migrations/011_job_leases.js';
 
 // Migrations are imported as modules rather than read from disk with
 // readFileSync + import.meta.url. Vercel's bundler does not trace a runtime
 // file read, so the previous schema.sql load silently failed in production.
-const migrations = [baseline, authSessions, seedFeed, safetyEngine, monitoringToggle, feedMedia, fafConnections, accountTypes, sensorsPatterns, staleStatus];
+const migrations = [baseline, authSessions, seedFeed, safetyEngine, monitoringToggle, feedMedia, fafConnections, accountTypes, sensorsPatterns, staleStatus, jobLeases];
 
 let migrationRun;
 

@@ -19,6 +19,7 @@ import { patternsRouter } from './routes/patterns.js';
 import { jobsRouter } from './routes/jobs.js';
 import { notFound, errorHandler, asyncRoute } from './middleware/errors.js';
 import { accessLogger } from './lib/audit.js';
+import { readLease } from './lib/jobLease.js';
 
 const app = express();
 
@@ -79,12 +80,30 @@ app.get(
     const schema = await ensureSchema();
     try {
       await pool.query('SELECT 1');
+
+      // The scheduler heartbeat. A monitor nobody is driving looks identical to
+      // a healthy one from the outside, which is exactly how abandoned impact
+      // countdowns went unnoticed, so its liveness is reported here.
+      const sweep = schema.ok ? await readLease('safety-sweep').catch(() => null) : null;
+
       return res.json({
         ok: schema.ok,
         database: 'connected',
         // Surfaced rather than swallowed, so a failed migration is visible.
         migrations: schema.ok ? 'applied' : `failed: ${schema.reason}`,
         demoAuth: config.allowDemoAuth,
+        scheduler: sweep
+          ? {
+              configured: Boolean(config.cronSecret),
+              ...sweep,
+              // Stale past a few minutes: the driver runs every minute, so a
+              // longer gap means it is delayed, disabled, or gone.
+              healthy:
+                sweep.everRan &&
+                sweep.secondsSinceLastRun !== null &&
+                sweep.secondsSinceLastRun <= config.sweepStaleAfterSeconds,
+            }
+          : { configured: Boolean(config.cronSecret), everRan: false },
       });
     } catch (error) {
       return res.status(503).json({ ok: false, database: 'disconnected', error: error.message });

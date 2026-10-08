@@ -68,8 +68,18 @@ export const config = {
   // cannot be triggered at all, so monitoring stays off rather than open.
   cronSecret: process.env.CRON_SECRET || '',
 
+  // How long /api/health tolerates between sweeps before calling the scheduler
+  // unhealthy. The driver aims for one minute; this allows for a late run
+  // without masking a driver that has actually stopped.
+  sweepStaleAfterSeconds: Number(process.env.SWEEP_STALE_AFTER_SECONDS || 300),
+
   // How long after a missed deadline before trusted contacts are alerted.
   escalationGraceMinutes: Number(process.env.ESCALATION_GRACE_MINUTES || 10),
+
+  // How long an escalation may sit half-finished before the sweep retries it.
+  // Covers a run killed part-way through alerting contacts; long enough that a
+  // merely slow push batch is not retried underneath itself.
+  escalationRetryAfterMinutes: Number(process.env.ESCALATION_RETRY_AFTER_MINUTES || 5),
 
   // How long someone has to cancel a detected impact before it escalates.
   // Long enough to find and unlock a phone after a real collision, short

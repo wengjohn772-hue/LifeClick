@@ -270,14 +270,18 @@ Trusted-contact escalation
 
 Required services:
 
-- Scheduler
-- Queue
-- Missed-check worker
-- Risk engine
-- Notification worker
-- SMS/call provider
-- Retry and idempotency handling
-- Incident and audit records
+| Service | Status |
+| --- | --- |
+| Scheduler | **Done.** `.github/workflows/safety-sweep.yml` pings `/api/jobs/safety-sweep` once a minute (5 pings per 5-minute trigger, since GitHub will not schedule more finely). Liveness is reported under `scheduler` in `/api/health`. |
+| Missed-check worker | **Done.** `runSafetySweep()` in `server/lib/safetyEngine.js`. |
+| Risk engine | **Done.** `server/lib/safetyEngine.js` plus `apps/mobile/src/lib/scoring.ts`. |
+| Notification worker | **Partly.** Expo push is wired; delivery is attempted inline rather than queued. |
+| Retry and idempotency handling | **Mostly.** A `job_leases` row makes the sweep single-flight cluster-wide, and both the incident-escalation and impact-expiry passes claim rows with `UPDATE … RETURNING`, so overlapping runs cannot alert one contact twice. An escalation abandoned mid-flight is handed back after `ESCALATION_RETRY_AFTER_MINUTES` and retried. **Outstanding:** an individual failed push is logged but never retried on its own. |
+| Incident and audit records | **Done.** `incidents`, `incident_notifications`, and the audit log. |
+| Queue | **Outstanding.** Escalation runs inline inside the sweep. |
+| SMS/call provider | **Outstanding.** A contact without an Inertia account is recorded as `pending_sms` and never actually reached — the most significant remaining gap in the escalation chain. |
+
+Scheduler caveats to resolve before any public safety commitment: GitHub's cron is best-effort and can run late, and scheduled workflows are **disabled automatically after 60 days without a commit**. Production should use a paid per-minute cron or Vercel Pro (`"crons"` in `vercel.json`), which is a one-line swap against the same endpoint.
 
 AWS target:
 

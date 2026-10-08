@@ -1,6 +1,7 @@
 import { query } from '../db/pool.js';
 import { config } from '../config.js';
 import { buildMessage, sendExpoPush, isExpoPushToken } from './expoPush.js';
+import { acquireLease, releaseLease } from './jobLease.js';
 
 /**
  * Server-owned safety monitoring.
@@ -190,40 +191,24 @@ async function escalateIncident(incident) {
   const body = `${owner.name} missed a Inertia safety check-in and has not responded.${where}`;
 
   let notified = 0;
+  const deliveryFailures = [];
 
   for (const contact of contacts) {
-    if (contact.contact_user_id) {
-      const push = await pushToUser(contact.contact_user_id, title, body, {
-        type: 'contact_escalation',
-        incidentId: incident.id,
-        fafId: owner.faf_id,
+    // Per contact, so one unreachable device cannot abort the escalation and
+    // leave the remaining contacts untold. The stage is advanced once this loop
+    // finishes, so an exception escaping here would strand the incident
+    // half-escalated with no retry.
+    try {
+      await notifyContact(incident, owner, contact, title, body, (count) => {
+        notified += count;
       });
-
-      if (push.attempted === 0) {
-        await logNotification(incident.id, 'push', contact.phone, 'contact', {
-          status: 'unavailable',
-          detail: 'Contact has a Inertia account but no registered device.',
-        });
-        continue;
-      }
-
-      for (const result of push.results) {
-        await logNotification(
-          incident.id,
-          'push',
-          result.to,
-          'contact',
-          result.ok ? { status: 'sent' } : { status: 'failed', detail: result.error }
-        );
-        if (result.ok) notified += 1;
-      }
-    } else {
-      // No delivery channel yet. Recorded rather than dropped so an SMS
-      // provider can be added without losing the escalation history.
-      await logNotification(incident.id, 'sms', contact.phone, 'contact', {
-        status: 'pending_sms',
-        detail: 'No SMS provider configured and contact is not a Inertia user.',
-      });
+    } catch (error) {
+      console.error(`[escalate] contact ${contact.id} failed:`, error.message);
+      deliveryFailures.push({ contactId: contact.id, error: error.message });
+      await logNotification(incident.id, 'push', contact.phone, 'contact', {
+        status: 'failed',
+        detail: error.message,
+      }).catch(() => undefined);
     }
   }
 
@@ -232,14 +217,46 @@ async function escalateIncident(incident) {
     [incident.id]
   );
 
-  return { notified, contacts: contacts.length };
+  return { notified, contacts: contacts.length, deliveryFailures };
 }
 
-/**
- * One pass of the safety monitor. Idempotent and safe to run concurrently:
- * incident stages gate every side effect, and the partial unique index
- * guarantees a single open incident per user.
- */
+/** One contact's delivery attempt, extracted so a failure can be isolated. */
+async function notifyContact(incident, owner, contact, title, body, countNotified) {
+  if (!contact.contact_user_id) {
+    // No delivery channel yet. Recorded rather than dropped so an SMS provider
+    // can be added without losing the escalation history.
+    await logNotification(incident.id, 'sms', contact.phone, 'contact', {
+      status: 'pending_sms',
+      detail: 'No SMS provider configured and contact is not a Inertia user.',
+    });
+    return;
+  }
+
+  const push = await pushToUser(contact.contact_user_id, title, body, {
+    type: 'contact_escalation',
+    incidentId: incident.id,
+    fafId: owner.faf_id,
+  });
+
+  if (push.attempted === 0) {
+    await logNotification(incident.id, 'push', contact.phone, 'contact', {
+      status: 'unavailable',
+      detail: 'Contact has a Inertia account but no registered device.',
+    });
+    return;
+  }
+
+  for (const result of push.results) {
+    await logNotification(
+      incident.id,
+      'push',
+      result.to,
+      'contact',
+      result.ok ? { status: 'sent' } : { status: 'failed', detail: result.error }
+    );
+    if (result.ok) countNotified(1);
+  }
+}
 
 /** Tells the user a new place or route was recorded. */
 export async function notifyPatternNovelty(userId, kind) {
@@ -298,11 +315,20 @@ async function sweepImpacts() {
   );
 
   // Window elapsed with no response: raise risk and escalate.
+  //
+  // Claimed the same way as incidents above — the row is marked `expired` in the
+  // statement that selects it, so two concurrent runs cannot both escalate one
+  // impact. The status change is also what the risk score reads, and it is
+  // correct the moment it is set regardless of how the escalation itself goes.
   const { rows: expired } = await query(
-    `SELECT id, user_id, kind, peak_g, latitude, longitude
-     FROM sensor_events
-     WHERE status = 'pending' AND confirm_deadline <= NOW()
-     LIMIT 200`
+    `UPDATE sensor_events SET status = 'expired', resolved_at = NOW()
+     WHERE id IN (
+       SELECT id FROM sensor_events
+       WHERE status = 'pending' AND confirm_deadline <= NOW()
+       ORDER BY confirm_deadline
+       LIMIT 200
+     )
+     RETURNING id, user_id, kind, peak_g, latitude, longitude`
   );
 
   for (const event of expired) {
@@ -319,16 +345,11 @@ async function sweepImpacts() {
       // still resolves, and escalation proceeds on the existing incident.
       const incident = incidentRows[0] ?? null;
 
-      await query(
-        `UPDATE sensor_events SET status = 'expired', resolved_at = NOW(), incident_id = $2 WHERE id = $1`,
-        [event.id, incident?.id ?? null]
-      );
-
       if (incident) {
+        await query(`UPDATE sensor_events SET incident_id = $2 WHERE id = $1`, [event.id, incident.id]);
+        // escalateIncident advances the stage itself once every contact has had
+        // an attempt, so no second update is needed here.
         await escalateIncident(incident);
-        await query(`UPDATE incidents SET stage = 'contacts_notified', escalated_at = NOW() WHERE id = $1`, [
-          incident.id,
-        ]);
       }
 
       escalated.push(event.id);
@@ -346,8 +367,57 @@ function describeImpact(kind) {
   return 'a heavy impact';
 }
 
+/**
+ * The scheduled safety monitor, guarded so only one run is ever in flight.
+ *
+ * Several things may call this — the cron driver, a manual trigger, a retry —
+ * and overlapping runs would alert the same contacts twice. The lease makes the
+ * whole pass single-flight across every serverless instance; the claim queries
+ * inside it are the second line of defence.
+ *
+ * The TTL is below the one-minute driver cadence so a run killed mid-flight
+ * (a serverless timeout) cannot block the following minute's run.
+ */
+const SWEEP_LEASE = 'safety-sweep';
+const SWEEP_LEASE_TTL_SECONDS = 45;
+
 export async function runSafetySweep() {
   const startedAt = Date.now();
+  const holder = await acquireLease(SWEEP_LEASE, SWEEP_LEASE_TTL_SECONDS);
+
+  // Not an error: the monitor is running, just not in this invocation.
+  if (!holder) {
+    return { ok: true, skipped: 'another sweep is already running', durationMs: Date.now() - startedAt };
+  }
+
+  let outcome = { ok: false, detail: { error: 'sweep did not complete' } };
+  try {
+    const result = await sweepOnce(startedAt);
+    // Recorded as the heartbeat, so /api/health can report what the last run
+    // actually did rather than merely that one happened.
+    outcome = {
+      ok: result.ok,
+      detail: {
+        incidentsOpened: result.incidentsOpened,
+        incidentsEscalated: result.incidentsEscalated,
+        impactsReminded: result.impactsReminded,
+        impactsEscalated: result.impactsEscalated,
+        failures: result.failures.length,
+      },
+    };
+    return result;
+  } catch (error) {
+    outcome = { ok: false, detail: { error: error.message } };
+    throw error;
+  } finally {
+    await releaseLease(SWEEP_LEASE, holder, {
+      ...outcome,
+      durationMs: Date.now() - startedAt,
+    }).catch((releaseError) => console.error('[sweep] lease release failed:', releaseError.message));
+  }
+}
+
+async function sweepOnce(startedAt) {
 
   // 1. Users past their deadline with no open incident yet.
   const { rows: overdue } = await query(
@@ -391,13 +461,41 @@ export async function runSafetySweep() {
     }
   }
 
-  // 2. Incidents past the grace period with the user still silent.
+  // 2a. Recover escalations abandoned mid-flight.
+  //
+  // The claim below moves an incident out of 'user_notified' before any contact
+  // is told, so a run killed between the two (a serverless timeout part-way
+  // through a slow push batch) would leave contacts unalerted with nothing to
+  // retry it. Anything stuck in 'escalating' past the retry window is handed
+  // back. A retry may re-alert a contact who was already reached, which for a
+  // possible emergency is clearly the better error than never reaching the rest.
+  const { rowCount: recovered } = await query(
+    `UPDATE incidents SET stage = 'user_notified'
+     WHERE status = 'open' AND stage = 'escalating'
+       AND escalated_at < NOW() - make_interval(mins => $1::int)`,
+    [config.escalationRetryAfterMinutes]
+  );
+  if (recovered) console.warn(`[sweep] recovered ${recovered} abandoned escalation(s)`);
+
+  // 2b. Incidents past the grace period with the user still silent.
+  //
+  // Claimed with an UPDATE rather than read with a SELECT: the stage is what
+  // gates escalation, so selecting first and advancing the stage afterwards
+  // leaves a window in which a second run reads the same row and alerts every
+  // contact a second time. Advancing the stage in the same statement that picks
+  // the row makes the claim atomic. escalateIncident moves it on to
+  // 'contacts_notified' once every contact has had an attempt.
   const { rows: toEscalate } = await query(
-    `SELECT * FROM incidents
-     WHERE status = 'open'
-       AND stage = 'user_notified'
-       AND opened_at < NOW() - make_interval(mins => $1::int)
-     LIMIT 200`,
+    `UPDATE incidents SET stage = 'escalating', escalated_at = NOW()
+     WHERE id IN (
+       SELECT id FROM incidents
+       WHERE status = 'open'
+         AND stage = 'user_notified'
+         AND opened_at < NOW() - make_interval(mins => $1::int)
+       ORDER BY opened_at
+       LIMIT 200
+     )
+     RETURNING *`,
     [config.escalationGraceMinutes]
   );
 

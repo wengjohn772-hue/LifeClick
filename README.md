@@ -102,26 +102,53 @@ Checking in — from the app or straight from the push notification — resolves
 
 ### Running the scheduler
 
-The sweep is just an authenticated endpoint, so any scheduler works:
+Nothing escalates unless something calls the sweep on a schedule. **Detection latency equals the gap between runs**, so a 120-second collision countdown needs roughly a one-minute cadence.
 
-```bash
-curl -X POST https://your-app.vercel.app/api/jobs/safety-sweep \
-  -H "x-cron-secret: $CRON_SECRET"
+#### What is wired up
+
+**`.github/workflows/safety-sweep.yml`** is the driver. GitHub's scheduler will not fire more often than every 5 minutes, which is far too coarse, so each run pings once a minute for the five minutes it owns — one 5-minute trigger, five sweeps, ~1-minute latency. Actions minutes are free and unlimited on a public repo.
+
+It needs two repository secrets (**Settings → Secrets and variables → Actions**):
+
+| Secret | Value |
+| --- | --- |
+| `SWEEP_URL` | `https://life-click-rho.vercel.app/api/jobs/safety-sweep` |
+| `CRON_SECRET` | the same value as the `CRON_SECRET` environment variable in Vercel |
+
+Then run it once by hand from the **Actions** tab (*Safety sweep → Run workflow*) to confirm the secrets are right. If all five pings fail the run goes **red and GitHub emails you** — for a safety monitor, a driver that has quietly stopped is the thing most worth being told about.
+
+**`vercel.json`** schedules `/api/jobs/prune` daily for data retention. That one is fine at daily frequency, which is all Vercel's Hobby plan allows.
+
+#### Caveats worth knowing
+
+- GitHub's cron is best-effort and can be delayed under load, so the real-world gap is sometimes 2–3 minutes rather than 1.
+- **Scheduled workflows are disabled automatically after 60 days without a commit to the repo.** If the project goes quiet, monitoring stops. Check `/api/health` or push a commit.
+- For a production safety service, move to a paid per-minute cron (cron-job.org, Upstash QStash) or Vercel Pro and replace the workflow with a `"* * * * *"` entry in `vercel.json`. Both hit the same endpoint, so it is a one-line swap.
+
+#### Checking it is alive
+
+`GET /api/health` reports the scheduler heartbeat:
+
+```json
+"scheduler": {
+  "configured": true, "everRan": true, "healthy": true,
+  "secondsSinceLastRun": 43, "runCount": 120, "skippedCount": 0,
+  "lastOk": true, "lastDetail": { "incidentsOpened": 0, "impactsEscalated": 0, "failures": 0 }
+}
 ```
 
-**Every minute is the right cadence** — detection latency is bounded by the gap between runs. Options:
+`healthy` goes false once no sweep has finished for `SWEEP_STALE_AFTER_SECONDS` (default 300). Watch that field — a monitor nobody is driving looks identical to a healthy one from the outside, which is exactly how abandoned impact countdowns went unnoticed before.
 
-| Where | Notes |
-| --- | --- |
-| cron-job.org, Upstash QStash | Free, per-minute, works with Vercel Hobby. GET is supported too. |
-| GitHub Actions | Free, but scheduled workflows are only *approximately* every 5 min. |
-| Vercel Cron | Clean, but **Hobby only fires once per day** — useless here. Needs Pro. |
+#### Notes
 
-`CRON_SECRET` **must** be set or the endpoint returns 503 and monitoring stays off. That fails safe: better visibly disabled than publicly triggerable.
+- `CRON_SECRET` **must** be set or the endpoint returns 503 and monitoring stays off. That fails safe: better visibly disabled than publicly triggerable. Both `x-cron-secret:` and `Authorization: Bearer` are accepted (the latter is what Vercel Cron sends), and `GET` works for services that cannot issue `POST`.
+- The sweep holds a database lease, so it is safe to point several drivers at it or trigger it by hand while one is running — an overlapping run is skipped rather than alerting anyone's contacts twice. An escalation that dies part-way through is handed back and retried after `ESCALATION_RETRY_AFTER_MINUTES`.
+- Locally, `npm run sweep` polls the endpoint on a loop as a stand-in.
 
-Locally, `npm run sweep` polls the endpoint on a loop as a stand-in.
-
-Also schedule `/api/jobs/prune` (hourly or daily) to enforce retention.
+```bash
+curl -X POST https://life-click-rho.vercel.app/api/jobs/safety-sweep \
+  -H "x-cron-secret: $CRON_SECRET"
+```
 
 ### Escalation channels
 

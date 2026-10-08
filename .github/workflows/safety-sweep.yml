@@ -1,0 +1,85 @@
+name: Safety sweep
+
+# Drives the server-side safety monitor: missed check-ins and unanswered impact
+# countdowns are only detected when something calls /api/jobs/safety-sweep.
+#
+# GitHub's scheduler will not run more often than every 5 minutes, which is far
+# too coarse for a 120-second collision countdown. So each run pings once a
+# minute for the five minutes it owns, giving roughly one-minute detection
+# latency from a 5-minute trigger. The sweep holds a database lease, so an
+# overlapping ping is skipped rather than double-alerting anyone's contacts.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  # Lets you prove the wiring works without waiting for the schedule.
+  workflow_dispatch:
+
+# Never let two runs stack up if GitHub's scheduler is running late.
+concurrency:
+  group: safety-sweep
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    # Comfortably above the 4-minute ping loop, so a hung request cannot hold
+    # the concurrency group and block the next run.
+    timeout-minutes: 7
+    steps:
+      - name: Ping the sweep once a minute
+        env:
+          SWEEP_URL: ${{ secrets.SWEEP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${SWEEP_URL}" ] || [ -z "${CRON_SECRET}" ]; then
+            echo "::error::SWEEP_URL and CRON_SECRET repository secrets are required."
+            echo "Set them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          # Pings at 0s, 60s, 120s, 180s and 240s. The next scheduled run picks
+          # up at the 5-minute mark, so coverage is continuous.
+          PINGS=5
+          failures=0
+
+          for i in $(seq 1 "${PINGS}"); do
+            # --max-time guards against a cold serverless start hanging the loop
+            # and pushing every later ping late.
+            body=$(mktemp)
+            # curl already writes 000 as the status when it cannot connect, so
+            # its exit code is deliberately not folded into this substitution --
+            # doing so would append a second 000 to the real one.
+            code=$(curl --silent --show-error --max-time 30 \
+                        --output "${body}" --write-out '%{http_code}' \
+                        --request POST \
+                        --header "x-cron-secret: ${CRON_SECRET}" \
+                        --header 'content-type: application/json' \
+                        "${SWEEP_URL}")
+            code=${code:-000}
+
+            if [ "${code}" = "200" ]; then
+              echo "ping ${i}/${PINGS}: $(cat "${body}")"
+            else
+              failures=$((failures + 1))
+              echo "::warning::ping ${i}/${PINGS} failed with HTTP ${code}: $(cat "${body}")"
+            fi
+            rm -f "${body}"
+
+            if [ "${i}" -lt "${PINGS}" ]; then sleep 60; fi
+          done
+
+          # A red run emails you. For a safety monitor, a driver that has quietly
+          # stopped working is the thing most worth being told about, so every
+          # ping failing is treated as a build failure rather than a warning.
+          if [ "${failures}" -eq "${PINGS}" ]; then
+            echo "::error::All ${PINGS} sweep pings failed. Safety monitoring is DOWN."
+            exit 1
+          fi
+
+          echo "Completed with ${failures}/${PINGS} failed pings."
