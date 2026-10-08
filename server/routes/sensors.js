@@ -11,6 +11,13 @@ export const sensorsRouter = Router();
 
 sensorsRouter.use(requireAuth, requireDatabase);
 
+/**
+ * How long an unanswered confirmation stays escalatable. Past this the sweep
+ * would be alerting contacts about something that happened far too long ago to
+ * act on, so it is retired instead.
+ */
+const STALE_AFTER_MINUTES = 15;
+
 const impactSchema = z.object({
   kind: z.enum(['impact', 'crash', 'fall']),
   peakG: z.coerce.number().min(0).max(200).optional(),
@@ -36,11 +43,26 @@ sensorsRouter.post(
 
     const { kind, peakG, followedByStillness, riskWeight, latitude, longitude } = req.body;
 
+    // Retire confirmations whose window closed long enough ago that escalating
+    // them now would be a false alarm — the person is plainly conscious, since
+    // they are reporting a new impact. Marked `stale`, not `expired`: `expired`
+    // is what the sweep sets after it has actually escalated, and it counts
+    // towards the risk score. Anything inside the grace window is left alone so
+    // a running sweep can still escalate it properly.
+    await query(
+      `UPDATE sensor_events SET status = 'stale', resolved_at = NOW()
+       WHERE user_id = $1 AND status = 'pending'
+         AND confirm_deadline <= NOW() - make_interval(mins => $2::int)`,
+      [req.user.id, STALE_AFTER_MINUTES]
+    );
+
     // One open confirmation at a time: a tumble produces several impacts, and
-    // each should not start its own countdown.
+    // each should not start its own countdown. Only a window that is still
+    // running counts — an elapsed one is not something to re-join, and treating
+    // it as one is what made every later alarm open already at zero.
     const { rows: open } = await query(
       `SELECT id, kind, confirm_deadline FROM sensor_events
-       WHERE user_id = $1 AND status = 'pending'
+       WHERE user_id = $1 AND status = 'pending' AND confirm_deadline > NOW()
        ORDER BY detected_at DESC LIMIT 1`,
       [req.user.id]
     );

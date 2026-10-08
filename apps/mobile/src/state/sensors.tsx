@@ -45,10 +45,15 @@ export function SensorsProvider({ children, enabled }: { children: ReactNode; en
         riskWeight: riskWeightFor(event),
       });
 
+      // Never open an alarm that is already over. A countdown showing zero is
+      // worse than none: it cannot be cancelled and tells the user nothing.
+      const seconds = Math.max(0, Math.round((new Date(result.event.confirmDeadline).getTime() - Date.now()) / 1000));
+      if (seconds <= 0) return;
+
       setPending(result.event);
-      setSecondsRemaining(result.event.secondsRemaining);
-      await notifyImpactDetected(event.kind, result.event.secondsRemaining);
-      await startImpactReminders(event.kind, result.event.secondsRemaining);
+      setSecondsRemaining(seconds);
+      await notifyImpactDetected(event.kind, seconds);
+      await startImpactReminders(event.kind, seconds);
     } catch {
       // Offline: still show the alarm locally so the user can respond. The
       // server cannot escalate what it never received, which is the honest
@@ -98,9 +103,17 @@ export function SensorsProvider({ children, enabled }: { children: ReactNode; en
     const check = async () => {
       const result = await getPendingImpact().catch(() => null);
       if (!result) return;
-      if (result.event) {
+
+      // Recompute against the wall clock rather than trusting the number the
+      // server produced: it was correct when sent, but the round trip and any
+      // clock skew make it stale by the time it is rendered.
+      const seconds = result.event
+        ? Math.max(0, Math.round((new Date(result.event.confirmDeadline).getTime() - Date.now()) / 1000))
+        : 0;
+
+      if (result.event && seconds > 0) {
         setPending(result.event);
-        setSecondsRemaining(result.event.secondsRemaining);
+        setSecondsRemaining(seconds);
       } else {
         setPending(null);
       }

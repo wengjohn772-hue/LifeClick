@@ -289,6 +289,14 @@ async function sweepImpacts() {
     }
   }
 
+  // Anything abandoned far in the past is retired rather than escalated:
+  // alerting contacts about an impact from hours ago helps nobody and reads as
+  // a false alarm. This also catches rows left behind while no scheduler ran.
+  await query(
+    `UPDATE sensor_events SET status = 'stale', resolved_at = NOW()
+     WHERE status = 'pending' AND confirm_deadline <= NOW() - INTERVAL '15 minutes'`
+  );
+
   // Window elapsed with no response: raise risk and escalate.
   const { rows: expired } = await query(
     `SELECT id, user_id, kind, peak_g, latitude, longitude
